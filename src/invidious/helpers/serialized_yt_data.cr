@@ -12,6 +12,7 @@ struct SearchVideo
   property live_now : Bool
   property premium : Bool
   property premiere_timestamp : Time?
+  property author_verified : Bool
 
   def to_xml(auto_generated, query_params, xml : XML::Builder)
     query_params["v"] = self.id
@@ -64,7 +65,7 @@ struct SearchVideo
     end
   end
 
-  def to_json(locale : Hash(String, JSON::Any) | Nil, json : JSON::Builder)
+  def to_json(locale : String?, json : JSON::Builder)
     json.object do
       json.field "type", "video"
       json.field "title", self.title
@@ -73,15 +74,17 @@ struct SearchVideo
       json.field "author", self.author
       json.field "authorId", self.ucid
       json.field "authorUrl", "/channel/#{self.ucid}"
+      json.field "authorVerified", self.author_verified
 
       json.field "videoThumbnails" do
-        generate_thumbnails(json, self.id)
+        Invidious::JSONify::APIv1.thumbnails(json, self.id)
       end
 
       json.field "description", html_to_content(self.description_html)
       json.field "descriptionHtml", self.description_html
 
       json.field "viewCount", self.views
+      json.field "viewCountText", translate_count(locale, "generic_views_count", self.views, NumberFormatting::Short)
       json.field "published", self.published.to_unix
       json.field "publishedText", translate(locale, "`x` ago", recode_date(self.published, locale))
       json.field "lengthSeconds", self.length_seconds
@@ -96,7 +99,7 @@ struct SearchVideo
   end
 
   # TODO: remove the locale and follow the crystal convention
-  def to_json(locale : Hash(String, JSON::Any) | Nil, _json : Nil)
+  def to_json(locale : String?, _json : Nil)
     JSON.build do |json|
       to_json(locale, json)
     end
@@ -129,8 +132,9 @@ struct SearchPlaylist
   property video_count : Int32
   property videos : Array(SearchPlaylistVideo)
   property thumbnail : String?
+  property author_verified : Bool
 
-  def to_json(locale : Hash(String, JSON::Any) | Nil, json : JSON::Builder)
+  def to_json(locale : String?, json : JSON::Builder)
     json.object do
       json.field "type", "playlist"
       json.field "title", self.title
@@ -140,6 +144,8 @@ struct SearchPlaylist
       json.field "author", self.author
       json.field "authorId", self.ucid
       json.field "authorUrl", "/channel/#{self.ucid}"
+
+      json.field "authorVerified", self.author_verified
 
       json.field "videoCount", self.video_count
       json.field "videos" do
@@ -151,7 +157,7 @@ struct SearchPlaylist
               json.field "lengthSeconds", video.length_seconds
 
               json.field "videoThumbnails" do
-                generate_thumbnails(json, video.id)
+                Invidious::JSONify::APIv1.thumbnails(json, video.id)
               end
             end
           end
@@ -161,7 +167,7 @@ struct SearchPlaylist
   end
 
   # TODO: remove the locale and follow the crystal convention
-  def to_json(locale : Hash(String, JSON::Any) | Nil, _json : Nil)
+  def to_json(locale : String?, _json : Nil)
     JSON.build do |json|
       to_json(locale, json)
     end
@@ -182,14 +188,15 @@ struct SearchChannel
   property video_count : Int32
   property description_html : String
   property auto_generated : Bool
+  property author_verified : Bool
 
-  def to_json(locale : Hash(String, JSON::Any) | Nil, json : JSON::Builder)
+  def to_json(locale : String?, json : JSON::Builder)
     json.object do
       json.field "type", "channel"
       json.field "author", self.author
       json.field "authorId", self.ucid
       json.field "authorUrl", "/channel/#{self.ucid}"
-
+      json.field "authorVerified", self.author_verified
       json.field "authorThumbnails" do
         json.array do
           qualities = {32, 48, 76, 100, 176, 512}
@@ -214,7 +221,7 @@ struct SearchChannel
   end
 
   # TODO: remove the locale and follow the crystal convention
-  def to_json(locale : Hash(String, JSON::Any) | Nil, _json : Nil)
+  def to_json(locale : String?, _json : Nil)
     JSON.build do |json|
       to_json(locale, json)
     end
@@ -234,7 +241,7 @@ class Category
   property description_html : String
   property badges : Array(Tuple(String, String))?
 
-  def to_json(locale : Hash(String, JSON::Any) | Nil, json : JSON::Builder)
+  def to_json(locale : String?, json : JSON::Builder)
     json.object do
       json.field "type", "category"
       json.field "title", self.title
@@ -249,7 +256,7 @@ class Category
   end
 
   # TODO: remove the locale and follow the crystal convention
-  def to_json(locale : Hash(String, JSON::Any) | Nil, _json : Nil)
+  def to_json(locale : String?, _json : Nil)
     JSON.build do |json|
       to_json(locale, json)
     end
@@ -257,6 +264,13 @@ class Category
 
   def to_json(json : JSON::Builder)
     to_json(nil, json)
+  end
+end
+
+struct Continuation
+  getter token
+
+  def initialize(@token : String)
   end
 end
 

@@ -1,3 +1,5 @@
+require "../helpers/serialized_yt_data"
+
 # This file contains helper methods to parse the Youtube API json data into
 # neat little packages we can use
 
@@ -5,7 +7,7 @@
 private ITEM_CONTAINER_EXTRACTOR = {
   Extractors::YouTubeTabs,
   Extractors::SearchResults,
-  Extractors::Continuation,
+  Extractors::ContinuationContent,
 }
 
 private ITEM_PARSERS = {
@@ -14,7 +16,13 @@ private ITEM_PARSERS = {
   Parsers::GridPlaylistRendererParser,
   Parsers::PlaylistRendererParser,
   Parsers::CategoryRendererParser,
+  Parsers::RichItemRendererParser,
+  Parsers::ReelItemRendererParser,
+  Parsers::ItemSectionRendererParser,
+  Parsers::ContinuationItemRendererParser,
 }
+
+private alias InitialData = Hash(String, JSON::Any)
 
 record AuthorFallback, name : String, id : String
 
@@ -49,10 +57,15 @@ private module Parsers
       if author_info = item_contents.dig?("ownerText", "runs", 0)
         author = author_info["text"].as_s
         author_id = HelperExtractors.get_browse_id(author_info)
+      elsif author_info = item_contents.dig?("shortBylineText", "runs", 0)
+        author = author_info["text"].as_s
+        author_id = HelperExtractors.get_browse_id(author_info)
       else
         author = author_fallback.name
         author_id = author_fallback.id
       end
+
+      author_verified = has_verified_badge?(item_contents["ownerBadges"]?)
 
       # For live videos (and possibly recently premiered videos) there is no published information.
       # Instead, in its place is the amount of people currently watching. This behavior should be replicated
@@ -66,20 +79,27 @@ private module Parsers
       # TODO change default value to nil and typical encoding type to tuple storing type (watchers, views, etc)
       # and count
       view_count = item_contents.dig?("viewCountText", "simpleText").try &.as_s.gsub(/\D+/, "").to_i64? || 0_i64
-      description_html = item_contents["descriptionSnippet"]?.try { |t| parse_content(t) } || ""
+      description_html = item_contents["descriptionSnippet"]?.try { |t| parse_content(t, video_id) } || ""
 
-      # The length information *should* only always exist in "lengthText". However, the legacy Invidious code
-      # extracts from "thumbnailOverlays" when it doesn't. More testing is needed to see if this is
-      # actually needed
+      # The length information generally exist in "lengthText". However, the info can sometimes
+      # be retrieved from "thumbnailOverlays" (e.g when the video is a "shorts" one).
       if length_container = item_contents["lengthText"]?
         length_seconds = decode_length_seconds(length_container["simpleText"].as_s)
       elsif length_container = item_contents["thumbnailOverlays"]?.try &.as_a.find(&.["thumbnailOverlayTimeStatusRenderer"]?)
         # This needs to only go down the `simpleText` path (if possible). If more situations came up that requires
         # a specific pathway then we should add an argument to extract_text that'll make this possible
-        length_seconds = length_container.dig?("thumbnailOverlayTimeStatusRenderer", "text", "simpleText")
+        length_text = length_container.dig?("thumbnailOverlayTimeStatusRenderer", "text", "simpleText")
 
-        if length_seconds
-          length_seconds = decode_length_seconds(length_seconds.as_s)
+        if length_text
+          length_text = length_text.as_s
+
+          if length_text == "SHORTS"
+            # Approximate length to one minute, as "shorts" generally don't exceed that length.
+            # TODO: Add some sort of metadata for the type of video (normal, live, premiere, shorts)
+            length_seconds = 60_i32
+          else
+            length_seconds = decode_length_seconds(length_text)
+          end
         else
           length_seconds = 0
         end
@@ -119,6 +139,7 @@ private module Parsers
         live_now:           live_now,
         premium:            premium,
         premiere_timestamp: premiere_timestamp,
+        author_verified:    author_verified,
       })
     end
 
@@ -146,13 +167,24 @@ private module Parsers
     private def self.parse(item_contents, author_fallback)
       author = extract_text(item_contents["title"]) || author_fallback.name
       author_id = item_contents["channelId"]?.try &.as_s || author_fallback.id
-
+      author_verified = has_verified_badge?(item_contents["ownerBadges"]?)
       author_thumbnail = HelperExtractors.get_thumbnails(item_contents)
+
       # When public subscriber count is disabled, the subscriberCountText isn't sent by InnerTube.
       # Always simpleText
       # TODO change default value to nil
+
       subscriber_count = item_contents.dig?("subscriberCountText", "simpleText")
-        .try { |s| short_text_to_number(s.as_s.split(" ")[0]) } || 0
+
+      # Since youtube added channel handles, `VideoCountText` holds the number of
+      # subscribers and `subscriberCountText` holds the handle, except when the
+      # channel doesn't have a handle (e.g: some topic music channels).
+      # See https://github.com/iv-org/invidious/issues/3394#issuecomment-1321261688
+      if !subscriber_count || !subscriber_count.as_s.includes? " subscriber"
+        subscriber_count = item_contents.dig?("videoCountText", "simpleText")
+      end
+      subscriber_count = subscriber_count
+        .try { |s| short_text_to_number(s.as_s.split(" ")[0]).to_i32 } || 0
 
       # Auto-generated channels doesn't have videoCountText
       # Taken from: https://github.com/iv-org/invidious/pull/2228#discussion_r717620922
@@ -169,6 +201,7 @@ private module Parsers
         video_count:      video_count,
         description_html: description_html,
         auto_generated:   auto_generated,
+        author_verified:  author_verified,
       })
     end
 
@@ -197,17 +230,20 @@ private module Parsers
       title = extract_text(item_contents["title"]) || ""
       plid = item_contents["playlistId"]?.try &.as_s || ""
 
+      author_verified = has_verified_badge?(item_contents["ownerBadges"]?)
+
       video_count = HelperExtractors.get_video_count(item_contents)
       playlist_thumbnail = HelperExtractors.get_thumbnails(item_contents)
 
       SearchPlaylist.new({
-        title:       title,
-        id:          plid,
-        author:      author_fallback.name,
-        ucid:        author_fallback.id,
-        video_count: video_count,
-        videos:      [] of SearchPlaylistVideo,
-        thumbnail:   playlist_thumbnail,
+        title:           title,
+        id:              plid,
+        author:          author_fallback.name,
+        ucid:            author_fallback.id,
+        video_count:     video_count,
+        videos:          [] of SearchPlaylistVideo,
+        thumbnail:       playlist_thumbnail,
+        author_verified: author_verified,
       })
     end
 
@@ -232,7 +268,7 @@ private module Parsers
     end
 
     private def self.parse(item_contents, author_fallback)
-      title = item_contents["title"]["simpleText"]?.try &.as_s || ""
+      title = extract_text(item_contents["title"]) || ""
       plid = item_contents["playlistId"]?.try &.as_s || ""
 
       video_count = HelperExtractors.get_video_count(item_contents)
@@ -241,6 +277,7 @@ private module Parsers
       author_info = item_contents.dig?("shortBylineText", "runs", 0)
       author = author_info.try &.["text"].as_s || author_fallback.name
       author_id = author_info.try { |x| HelperExtractors.get_browse_id(x) } || author_fallback.id
+      author_verified = has_verified_badge?(item_contents["ownerBadges"]?)
 
       videos = item_contents["videos"]?.try &.as_a.map do |v|
         v = v["childVideoRenderer"]
@@ -257,13 +294,14 @@ private module Parsers
       # TODO: item_contents["publishedTimeText"]?
 
       SearchPlaylist.new({
-        title:       title,
-        id:          plid,
-        author:      author,
-        ucid:        author_id,
-        video_count: video_count,
-        videos:      videos,
-        thumbnail:   playlist_thumbnail,
+        title:           title,
+        id:              plid,
+        author:          author,
+        ucid:            author_id,
+        video_count:     video_count,
+        videos:          videos,
+        thumbnail:       playlist_thumbnail,
+        author_verified: author_verified,
       })
     end
 
@@ -321,14 +359,9 @@ private module Parsers
         content_container = item_contents["contents"]
       end
 
-      raw_contents = content_container["items"]?.try &.as_a
-      if !raw_contents.nil?
-        raw_contents.each do |item|
-          result = extract_item(item)
-          if !result.nil?
-            contents << result
-          end
-        end
+      content_container["items"]?.try &.as_a.each do |item|
+        result = parse_item(item, author_fallback.name, author_fallback.id)
+        contents << result if result.is_a?(SearchItem)
       end
 
       Category.new({
@@ -338,6 +371,180 @@ private module Parsers
         url:              url,
         badges:           badges,
       })
+    end
+
+    def self.parser_name
+      return {{@type.name}}
+    end
+  end
+
+  # Parses an InnerTube itemSectionRenderer into a SearchVideo.
+  # Returns nil when the given object isn't a ItemSectionRenderer
+  #
+  # A itemSectionRenderer seems to be a simple wrapper for a videoRenderer or a playlistRenderer, used
+  # by the result page for channel searches. It is located inside a continuationItems
+  # container.It is very similar to RichItemRendererParser
+  #
+  module ItemSectionRendererParser
+    def self.process(item : JSON::Any, author_fallback : AuthorFallback)
+      if item_contents = item.dig?("itemSectionRenderer", "contents", 0)
+        return self.parse(item_contents, author_fallback)
+      end
+    end
+
+    private def self.parse(item_contents, author_fallback)
+      child = VideoRendererParser.process(item_contents, author_fallback)
+      child ||= PlaylistRendererParser.process(item_contents, author_fallback)
+
+      return child
+    end
+
+    def self.parser_name
+      return {{@type.name}}
+    end
+  end
+
+  # Parses an InnerTube richItemRenderer into a SearchVideo.
+  # Returns nil when the given object isn't a RichItemRenderer
+  #
+  # A richItemRenderer seems to be a simple wrapper for a videoRenderer, used
+  # by the result page for hashtags and for the podcast tab on channels.
+  # It is located inside a continuationItems container for hashtags.
+  #
+  module RichItemRendererParser
+    def self.process(item : JSON::Any, author_fallback : AuthorFallback)
+      if item_contents = item.dig?("richItemRenderer", "content")
+        return self.parse(item_contents, author_fallback)
+      end
+    end
+
+    private def self.parse(item_contents, author_fallback)
+      child = VideoRendererParser.process(item_contents, author_fallback)
+      child ||= ReelItemRendererParser.process(item_contents, author_fallback)
+      child ||= PlaylistRendererParser.process(item_contents, author_fallback)
+      return child
+    end
+
+    def self.parser_name
+      return {{@type.name}}
+    end
+  end
+
+  # Parses an InnerTube reelItemRenderer into a SearchVideo.
+  # Returns nil when the given object isn't a reelItemRenderer
+  #
+  # reelItemRenderer items are used in the new (2022) channel layout,
+  # in the "shorts" tab.
+  #
+  module ReelItemRendererParser
+    def self.process(item : JSON::Any, author_fallback : AuthorFallback)
+      if item_contents = item["reelItemRenderer"]?
+        return self.parse(item_contents, author_fallback)
+      end
+    end
+
+    private def self.parse(item_contents, author_fallback)
+      video_id = item_contents["videoId"].as_s
+
+      reel_player_overlay = item_contents.dig(
+        "navigationEndpoint", "reelWatchEndpoint",
+        "overlay", "reelPlayerOverlayRenderer"
+      )
+
+      if video_details_container = reel_player_overlay.dig?(
+           "reelPlayerHeaderSupportedRenderers",
+           "reelPlayerHeaderRenderer"
+         )
+        # Author infos
+
+        author = video_details_container
+          .dig?("channelTitleText", "runs", 0, "text")
+          .try &.as_s || author_fallback.name
+
+        ucid = video_details_container
+          .dig?("channelNavigationEndpoint", "browseEndpoint", "browseId")
+          .try &.as_s || author_fallback.id
+
+        # Title & publication date
+
+        title = video_details_container.dig?("reelTitleText")
+          .try { |t| extract_text(t) } || ""
+
+        published = video_details_container
+          .dig?("timestampText", "simpleText")
+          .try { |t| decode_date(t.as_s) } || Time.utc
+
+        # View count
+        view_count_text = video_details_container.dig?("viewCountText", "simpleText")
+      else
+        author = author_fallback.name
+        ucid = author_fallback.id
+        published = Time.utc
+        title = item_contents.dig?("headline", "simpleText").try &.as_s || ""
+      end
+      # View count
+
+      # View count used to be in the reelWatchEndpoint, but that changed?
+      view_count_text ||= item_contents.dig?("viewCountText", "simpleText")
+
+      view_count = short_text_to_number(view_count_text.try &.as_s || "0")
+
+      # Duration
+
+      a11y_data = item_contents
+        .dig?("accessibility", "accessibilityData", "label")
+        .try &.as_s || ""
+
+      regex_match = /- (?<min>\d+ minutes? )?(?<sec>\d+ seconds?)+ -/.match(a11y_data)
+
+      minutes = regex_match.try &.["min"]?.try &.to_i(strict: false) || 0
+      seconds = regex_match.try &.["sec"]?.try &.to_i(strict: false) || 0
+
+      duration = (minutes*60 + seconds)
+
+      SearchVideo.new({
+        title:              title,
+        id:                 video_id,
+        author:             author,
+        ucid:               ucid,
+        published:          published,
+        views:              view_count,
+        description_html:   "",
+        length_seconds:     duration,
+        live_now:           false,
+        premium:            false,
+        premiere_timestamp: Time.unix(0),
+        author_verified:    false,
+      })
+    end
+
+    def self.parser_name
+      return {{@type.name}}
+    end
+  end
+
+  # Parses an InnerTube continuationItemRenderer into a Continuation.
+  # Returns nil when the given object isn't a continuationItemRenderer.
+  #
+  # continuationItemRenderer contains various metadata ued to load more
+  # content (i.e when the user scrolls down). The interesting bit is the
+  # protobuf object known as the "continutation token". Previously, those
+  # were generated from sratch, but recent (as of 11/2022) Youtube changes
+  # are forcing us to extract them from replies.
+  #
+  module ContinuationItemRendererParser
+    def self.process(item : JSON::Any, author_fallback : AuthorFallback)
+      if item_contents = item["continuationItemRenderer"]?
+        return self.parse(item_contents)
+      end
+    end
+
+    private def self.parse(item_contents)
+      token = item_contents
+        .dig?("continuationEndpoint", "continuationCommand", "token")
+        .try &.as_s
+
+      return Continuation.new(token) if token
     end
 
     def self.parser_name
@@ -371,7 +578,7 @@ private module Extractors
   #     {"tabRenderer":  {
   #       "endpoint": {...}
   #       "title": "Playlists",
-  #       "selected": true,
+  #       "selected": true, # Is nil unless tab is selected
   #       "content": {...},
   #       ...
   #     }}
@@ -379,7 +586,7 @@ private module Extractors
   # }]
   #
   module YouTubeTabs
-    def self.process(initial_data : Hash(String, JSON::Any))
+    def self.process(initial_data : InitialData)
       if target = initial_data["twoColumnBrowseResultsRenderer"]?
         self.extract(target)
       end
@@ -389,19 +596,37 @@ private module Extractors
       raw_items = [] of JSON::Any
       content = extract_selected_tab(target["tabs"])["content"]
 
-      content["sectionListRenderer"]["contents"].as_a.each do |renderer_container|
-        renderer_container_contents = renderer_container["itemSectionRenderer"]["contents"][0]
+      if section_list_contents = content.dig?("sectionListRenderer", "contents")
+        raw_items = unpack_section_list(section_list_contents)
+      elsif rich_grid_contents = content.dig?("richGridRenderer", "contents")
+        raw_items = rich_grid_contents.as_a
+      end
 
-        # Category extraction
-        if items_container = renderer_container_contents["shelfRenderer"]?
-          raw_items << renderer_container_contents
-          next
-        elsif items_container = renderer_container_contents["gridRenderer"]?
+      return raw_items
+    end
+
+    private def self.unpack_section_list(contents)
+      raw_items = [] of JSON::Any
+
+      contents.as_a.each do |item|
+        if item_section_content = item.dig?("itemSectionRenderer", "contents")
+          raw_items += self.unpack_item_section(item_section_content)
         else
-          items_container = renderer_container_contents
+          raw_items << item
         end
+      end
 
-        items_container["items"]?.try &.as_a.each do |item|
+      return raw_items
+    end
+
+    private def self.unpack_item_section(contents)
+      raw_items = [] of JSON::Any
+
+      contents.as_a.each do |item|
+        # Category extraction
+        if container = item.dig?("gridRenderer", "items") || item.dig?("items")
+          raw_items += container.as_a
+        else
           raw_items << item
         end
       end
@@ -432,7 +657,7 @@ private module Extractors
   # }
   #
   module SearchResults
-    def self.process(initial_data : Hash(String, JSON::Any))
+    def self.process(initial_data : InitialData)
       if target = initial_data["twoColumnSearchResultsRenderer"]?
         self.extract(target)
       end
@@ -465,24 +690,23 @@ private module Extractors
   # The way they are structured is too varied to be accurately written down here.
   # However, they all eventually lead to an array of parsable items after traversing
   # through the JSON structure.
-  module Continuation
-    def self.process(initial_data : Hash(String, JSON::Any))
+  module ContinuationContent
+    def self.process(initial_data : InitialData)
       if target = initial_data["continuationContents"]?
         self.extract(target)
       elsif target = initial_data["appendContinuationItemsAction"]?
+        self.extract(target)
+      elsif target = initial_data["reloadContinuationItemsCommand"]?
         self.extract(target)
       end
     end
 
     private def self.extract(target)
-      raw_items = [] of JSON::Any
-      if content = target["gridContinuation"]?
-        raw_items = content["items"].as_a
-      elsif content = target["continuationItems"]?
-        raw_items = content.as_a
-      end
+      content = target["continuationItems"]?
+      content ||= target.dig?("gridContinuation", "items")
+      content ||= target.dig?("richGridContinuation", "contents")
 
-      return raw_items
+      return content.nil? ? [] of JSON::Any : content.as_a
     end
 
     def self.extractor_name
@@ -495,18 +719,36 @@ end
 #
 # Mostly used to extract out repeated structures to deal with code
 # repetition.
-private module HelperExtractors
+module HelperExtractors
   # Retrieves the amount of videos present within the given InnerTube data.
   #
   # Returns a 0 when it's unable to do so
   def self.get_video_count(container : JSON::Any) : Int32
     if box = container["videoCountText"]?
-      return extract_text(box).try &.gsub(/\D/, "").to_i || 0
+      if (extracted_text = extract_text(box)) && !extracted_text.includes? " subscriber"
+        return extracted_text.gsub(/\D/, "").to_i
+      else
+        return 0
+      end
     elsif box = container["videoCount"]?
       return box.as_s.to_i
     else
       return 0
     end
+  end
+
+  # Retrieves the amount of views/viewers a video has.
+  # Seems to be used on related videos only
+  #
+  # Returns "0" when unable to parse
+  def self.get_short_view_count(container : JSON::Any) : String
+    box = container["shortViewCountText"]?
+    return "0" if !box
+
+    # Simpletext: "4M views"
+    # runs: {"text": "1.1K"},{"text":" watching"}
+    return box["simpleText"]?.try &.as_s.sub(" views", "") ||
+      box.dig?("runs", 0, "text").try &.as_s || "0"
   end
 
   # Retrieve lowest quality thumbnail from InnerTube data
@@ -535,8 +777,7 @@ end
 
 # Parses an item from Youtube's JSON response into a more usable structure.
 # The end result can either be a SearchVideo, SearchPlaylist or SearchChannel.
-def extract_item(item : JSON::Any, author_fallback : String? = "",
-                 author_id_fallback : String? = "")
+def parse_item(item : JSON::Any, author_fallback : String? = "", author_id_fallback : String? = "")
   # We "allow" nil values but secretly use empty strings instead. This is to save us the
   # hassle of modifying every author_fallback and author_id_fallback arg usage
   # which is more often than not nil.
@@ -544,51 +785,64 @@ def extract_item(item : JSON::Any, author_fallback : String? = "",
 
   # Cycles through all of the item parsers and attempt to parse the raw YT JSON data.
   # Each parser automatically validates the data given to see if the data is
-  # applicable to itself. If not nil is returned and the next parser is attemped.
+  # applicable to itself. If not nil is returned and the next parser is attempted.
   ITEM_PARSERS.each do |parser|
-    LOGGER.trace("extract_item: Attempting to parse item using \"#{parser.parser_name}\" (cycling...)")
+    LOGGER.trace("parse_item: Attempting to parse item using \"#{parser.parser_name}\" (cycling...)")
 
     if result = parser.process(item, author_fallback)
-      LOGGER.debug("extract_item: Successfully parsed via #{parser.parser_name}")
-
+      LOGGER.debug("parse_item: Successfully parsed via #{parser.parser_name}")
       return result
     else
-      LOGGER.trace("extract_item: Parser \"#{parser.parser_name}\" does not apply. Cycling to the next one...")
+      LOGGER.trace("parse_item: Parser \"#{parser.parser_name}\" does not apply. Cycling to the next one...")
     end
   end
 end
 
 # Parses multiple items from YouTube's initial JSON response into a more usable structure.
 # The end result is an array of SearchItem.
-def extract_items(initial_data : Hash(String, JSON::Any), author_fallback : String? = nil,
-                  author_id_fallback : String? = nil) : Array(SearchItem)
-  items = [] of SearchItem
-
+#
+# This function yields the container so that items can be parsed separately.
+#
+def extract_items(initial_data : InitialData, &block)
   if unpackaged_data = initial_data["contents"]?.try &.as_h
   elsif unpackaged_data = initial_data["response"]?.try &.as_h
+  elsif unpackaged_data = initial_data.dig?("onResponseReceivedActions", 1).try &.as_h
   elsif unpackaged_data = initial_data.dig?("onResponseReceivedActions", 0).try &.as_h
   else
     unpackaged_data = initial_data
   end
 
-  # This is identical to the parser cycling of extract_item().
+  # This is identical to the parser cycling of parse_item().
   ITEM_CONTAINER_EXTRACTOR.each do |extractor|
     LOGGER.trace("extract_items: Attempting to extract item container using \"#{extractor.extractor_name}\" (cycling...)")
 
     if container = extractor.process(unpackaged_data)
       LOGGER.debug("extract_items: Successfully unpacked container with \"#{extractor.extractor_name}\"")
       # Extract items in container
-      container.each do |item|
-        if parsed_result = extract_item(item, author_fallback, author_id_fallback)
-          items << parsed_result
-        end
-      end
-
-      break
+      container.each { |item| yield item }
     else
       LOGGER.trace("extract_items: Extractor \"#{extractor.extractor_name}\" does not apply. Cycling to the next one...")
     end
   end
+end
 
-  return items
+# Wrapper using the block function above
+def extract_items(
+  initial_data : InitialData,
+  author_fallback : String? = nil,
+  author_id_fallback : String? = nil
+) : {Array(SearchItem), String?}
+  items = [] of SearchItem
+  continuation = nil
+
+  extract_items(initial_data) do |item|
+    parsed = parse_item(item, author_fallback, author_id_fallback)
+
+    case parsed
+    when .is_a?(Continuation) then continuation = parsed.token
+    when .is_a?(SearchItem)   then items << parsed
+    end
+  end
+
+  return items, continuation
 end

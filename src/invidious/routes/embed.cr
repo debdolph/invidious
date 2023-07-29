@@ -2,13 +2,18 @@
 
 module Invidious::Routes::Embed
   def self.redirect(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
-
+    locale = env.get("preferences").as(Preferences).locale
     if plid = env.params.query["list"]?.try &.gsub(/[^a-zA-Z0-9_-]/, "")
       begin
-        playlist = get_playlist(PG_DB, plid, locale: locale)
+        playlist = get_playlist(plid)
         offset = env.params.query["index"]?.try &.to_i? || 0
-        videos = get_playlist_videos(PG_DB, playlist, offset: offset, locale: locale)
+        videos = get_playlist_videos(playlist, offset: offset)
+        if videos.empty?
+          url = "/playlist?list=#{plid}"
+          raise NotFoundException.new(translate(locale, "error_video_not_in_playlist", url))
+        end
+      rescue ex : NotFoundException
+        return error_template(404, ex)
       rescue ex
         return error_template(500, ex)
       end
@@ -26,11 +31,11 @@ module Invidious::Routes::Embed
   end
 
   def self.show(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
+    locale = env.get("preferences").as(Preferences).locale
     id = env.params.url["id"]
 
     plid = env.params.query["list"]?.try &.gsub(/[^a-zA-Z0-9_-]/, "")
-    continuation = process_continuation(PG_DB, env.params.query, plid, id)
+    continuation = process_continuation(env.params.query, plid, id)
 
     if md = env.params.query["playlist"]?
          .try &.match(/[a-zA-Z0-9_-]{11}(,[a-zA-Z0-9_-]{11})*/)
@@ -60,9 +65,15 @@ module Invidious::Routes::Embed
 
       if plid
         begin
-          playlist = get_playlist(PG_DB, plid, locale: locale)
+          playlist = get_playlist(plid)
           offset = env.params.query["index"]?.try &.to_i? || 0
-          videos = get_playlist_videos(PG_DB, playlist, offset: offset, locale: locale)
+          videos = get_playlist_videos(playlist, offset: offset)
+          if videos.empty?
+            url = "/playlist?list=#{plid}"
+            raise NotFoundException.new(translate(locale, "error_video_not_in_playlist", url))
+          end
+        rescue ex : NotFoundException
+          return error_template(404, ex)
         rescue ex
           return error_template(500, ex)
         end
@@ -119,9 +130,9 @@ module Invidious::Routes::Embed
     subscriptions ||= [] of String
 
     begin
-      video = get_video(id, PG_DB, region: params.region)
-    rescue ex : VideoRedirect
-      return env.redirect env.request.resource.gsub(id, ex.video_id)
+      video = get_video(id, region: params.region)
+    rescue ex : NotFoundException
+      return error_template(404, ex)
     rescue ex
       return error_template(500, ex)
     end
@@ -136,8 +147,8 @@ module Invidious::Routes::Embed
     #   PG_DB.exec("UPDATE users SET watched = array_append(watched, $1) WHERE email = $2", id, user.as(User).email)
     # end
 
-    if notifications && notifications.includes? id
-      PG_DB.exec("UPDATE users SET notifications = array_remove(notifications, $1) WHERE email = $2", id, user.as(User).email)
+    if CONFIG.enable_user_notifications && notifications && notifications.includes? id
+      Invidious::Database::Users.remove_notification(user.as(User), id)
       env.get("user").as(User).notifications.delete(id)
       notifications.delete(id)
     end

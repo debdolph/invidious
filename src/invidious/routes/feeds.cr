@@ -6,7 +6,7 @@ module Invidious::Routes::Feeds
   end
 
   def self.playlists(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
+    locale = env.get("preferences").as(Preferences).locale
 
     user = env.get? "user"
     referer = get_referer(env)
@@ -15,13 +15,14 @@ module Invidious::Routes::Feeds
 
     user = user.as(User)
 
-    items_created = PG_DB.query_all("SELECT * FROM playlists WHERE author = $1 AND id LIKE 'IV%' ORDER BY created", user.email, as: InvidiousPlaylist)
+    # TODO: make a single DB call and separate the items here?
+    items_created = Invidious::Database::Playlists.select_like_iv(user.email)
     items_created.map! do |item|
       item.author = ""
       item
     end
 
-    items_saved = PG_DB.query_all("SELECT * FROM playlists WHERE author = $1 AND id NOT LIKE 'IV%' ORDER BY created", user.email, as: InvidiousPlaylist)
+    items_saved = Invidious::Database::Playlists.select_not_like_iv(user.email)
     items_saved.map! do |item|
       item.author = ""
       item
@@ -31,7 +32,7 @@ module Invidious::Routes::Feeds
   end
 
   def self.popular(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
+    locale = env.get("preferences").as(Preferences).locale
 
     if CONFIG.popular_enabled
       templated "feeds/popular"
@@ -42,7 +43,7 @@ module Invidious::Routes::Feeds
   end
 
   def self.trending(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
+    locale = env.get("preferences").as(Preferences).locale
 
     trending_type = env.params.query["type"]?
     trending_type ||= "Default"
@@ -60,7 +61,7 @@ module Invidious::Routes::Feeds
   end
 
   def self.subscriptions(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
+    locale = env.get("preferences").as(Preferences).locale
 
     user = env.get? "user"
     sid = env.get? "sid"
@@ -82,10 +83,6 @@ module Invidious::Routes::Feeds
     headers = HTTP::Headers.new
     headers["Cookie"] = env.request.headers["Cookie"]
 
-    if !user.password
-      user, sid = get_user(sid, headers, PG_DB)
-    end
-
     max_results = env.params.query["max_results"]?.try &.to_i?.try &.clamp(0, MAX_ITEMS_PER_PAGE)
     max_results ||= user.preferences.max_results
     max_results ||= CONFIG.default_user_preferences.max_results
@@ -93,22 +90,27 @@ module Invidious::Routes::Feeds
     page = env.params.query["page"]?.try &.to_i?
     page ||= 1
 
-    videos, notifications = get_subscription_feed(PG_DB, user, max_results, page)
+    videos, notifications = get_subscription_feed(user, max_results, page)
 
-    # "updated" here is used for delivering new notifications, so if
-    # we know a user has looked at their feed e.g. in the past 10 minutes,
-    # they've already seen a video posted 20 minutes ago, and don't need
-    # to be notified.
-    PG_DB.exec("UPDATE users SET notifications = $1, updated = $2 WHERE email = $3", [] of String, Time.utc,
-      user.email)
-    user.notifications = [] of String
+    if CONFIG.enable_user_notifications
+      # "updated" here is used for delivering new notifications, so if
+      # we know a user has looked at their feed e.g. in the past 10 minutes,
+      # they've already seen a video posted 20 minutes ago, and don't need
+      # to be notified.
+      Invidious::Database::Users.clear_notifications(user)
+      user.notifications = [] of String
+    end
     env.set "user", user
+
+    # Used for pagination links
+    base_url = "/feed/subscriptions"
+    base_url += "?max_results=#{max_results}" if env.params.query.has_key?("max_results")
 
     templated "feeds/subscriptions"
   end
 
   def self.history(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
+    locale = env.get("preferences").as(Preferences).locale
 
     user = env.get? "user"
     referer = get_referer(env)
@@ -131,13 +133,17 @@ module Invidious::Routes::Feeds
     end
     watched ||= [] of String
 
+    # Used for pagination links
+    base_url = "/feed/history"
+    base_url += "?max_results=#{max_results}" if env.params.query.has_key?("max_results")
+
     templated "feeds/history"
   end
 
   # RSS feeds
 
   def self.rss_channel(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
+    locale = env.get("preferences").as(Preferences).locale
 
     env.response.headers["Content-Type"] = "application/atom+xml"
     env.response.content_type = "application/atom+xml"
@@ -150,24 +156,32 @@ module Invidious::Routes::Feeds
       channel = get_about_info(ucid, locale)
     rescue ex : ChannelRedirect
       return env.redirect env.request.resource.gsub(ucid, ex.channel_id)
+    rescue ex : NotFoundException
+      return error_atom(404, ex)
     rescue ex
       return error_atom(500, ex)
     end
 
+    namespaces = {
+      "yt"      => "http://www.youtube.com/xml/schemas/2015",
+      "media"   => "http://search.yahoo.com/mrss/",
+      "default" => "http://www.w3.org/2005/Atom",
+    }
+
     response = YT_POOL.client &.get("/feeds/videos.xml?channel_id=#{channel.ucid}")
-    rss = XML.parse_html(response.body)
+    rss = XML.parse(response.body)
 
-    videos = rss.xpath_nodes("//feed/entry").map do |entry|
-      video_id = entry.xpath_node("videoid").not_nil!.content
-      title = entry.xpath_node("title").not_nil!.content
+    videos = rss.xpath_nodes("//default:feed/default:entry", namespaces).map do |entry|
+      video_id = entry.xpath_node("yt:videoId", namespaces).not_nil!.content
+      title = entry.xpath_node("default:title", namespaces).not_nil!.content
 
-      published = Time.parse_rfc3339(entry.xpath_node("published").not_nil!.content)
-      updated = Time.parse_rfc3339(entry.xpath_node("updated").not_nil!.content)
+      published = Time.parse_rfc3339(entry.xpath_node("default:published", namespaces).not_nil!.content)
+      updated = Time.parse_rfc3339(entry.xpath_node("default:updated", namespaces).not_nil!.content)
 
-      author = entry.xpath_node("author/name").not_nil!.content
-      ucid = entry.xpath_node("channelid").not_nil!.content
-      description_html = entry.xpath_node("group/description").not_nil!.to_s
-      views = entry.xpath_node("group/community/statistics").not_nil!.["views"].to_i64
+      author = entry.xpath_node("default:author/default:name", namespaces).not_nil!.content
+      ucid = entry.xpath_node("yt:channelId", namespaces).not_nil!.content
+      description_html = entry.xpath_node("media:group/media:description", namespaces).not_nil!.to_s
+      views = entry.xpath_node("media:group/media:community/media:statistics", namespaces).not_nil!.["views"].to_i64
 
       SearchVideo.new({
         title:              title,
@@ -182,6 +196,7 @@ module Invidious::Routes::Feeds
         paid:               false,
         premium:            false,
         premiere_timestamp: nil,
+        author_verified:    false,
       })
     end
 
@@ -201,6 +216,12 @@ module Invidious::Routes::Feeds
           xml.element("uri") { xml.text "#{HOST_URL}/channel/#{channel.ucid}" }
         end
 
+        xml.element("image") do
+          xml.element("url") { xml.text channel.author_thumbnail }
+          xml.element("title") { xml.text channel.author }
+          xml.element("link", rel: "self", href: "#{HOST_URL}#{env.request.resource}")
+        end
+
         videos.each do |video|
           video.to_xml(channel.auto_generated, params, xml)
         end
@@ -209,7 +230,7 @@ module Invidious::Routes::Feeds
   end
 
   def self.rss_private(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
+    locale = env.get("preferences").as(Preferences).locale
 
     env.response.headers["Content-Type"] = "application/atom+xml"
     env.response.content_type = "application/atom+xml"
@@ -220,7 +241,7 @@ module Invidious::Routes::Feeds
       haltf env, status_code: 403
     end
 
-    user = PG_DB.query_one?("SELECT * FROM users WHERE token = $1", token.strip, as: User)
+    user = Invidious::Database::Users.select(token: token.strip)
     if !user
       haltf env, status_code: 403
     end
@@ -234,7 +255,7 @@ module Invidious::Routes::Feeds
 
     params = HTTP::Params.parse(env.params.query["params"]? || "")
 
-    videos, notifications = get_subscription_feed(PG_DB, user, max_results, page)
+    videos, notifications = get_subscription_feed(user, max_results, page)
 
     XML.build(indent: "  ", encoding: "UTF-8") do |xml|
       xml.element("feed", "xmlns:yt": "http://www.youtube.com/xml/schemas/2015",
@@ -253,7 +274,7 @@ module Invidious::Routes::Feeds
   end
 
   def self.rss_playlist(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
+    locale = env.get("preferences").as(Preferences).locale
 
     env.response.headers["Content-Type"] = "application/atom+xml"
     env.response.content_type = "application/atom+xml"
@@ -264,8 +285,8 @@ module Invidious::Routes::Feeds
     path = env.request.path
 
     if plid.starts_with? "IV"
-      if playlist = PG_DB.query_one?("SELECT * FROM playlists WHERE id = $1", plid, as: InvidiousPlaylist)
-        videos = get_playlist_videos(PG_DB, playlist, offset: 0, locale: locale)
+      if playlist = Invidious::Database::Playlists.select(id: plid)
+        videos = get_playlist_videos(playlist, offset: 0)
 
         return XML.build(indent: "  ", encoding: "UTF-8") do |xml|
           xml.element("feed", "xmlns:yt": "http://www.youtube.com/xml/schemas/2015",
@@ -362,9 +383,9 @@ module Invidious::Routes::Feeds
     end
 
     if ucid = HTTP::Params.parse(URI.parse(topic).query.not_nil!)["channel_id"]?
-      PG_DB.exec("UPDATE channels SET subscribed = $1 WHERE id = $2", Time.utc, ucid)
+      Invidious::Database::Channels.update_subscription_time(ucid)
     elsif plid = HTTP::Params.parse(URI.parse(topic).query.not_nil!)["playlist_id"]?
-      PG_DB.exec("UPDATE playlists SET subscribed = $1 WHERE id = $2", Time.utc, ucid)
+      Invidious::Database::Playlists.update_subscription_time(plid)
     else
       haltf env, status_code: 400
     end
@@ -374,7 +395,7 @@ module Invidious::Routes::Feeds
   end
 
   def self.push_notifications_post(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
+    locale = env.get("preferences").as(Preferences).locale
 
     token = env.params.url["token"]
     body = env.request.body.not_nil!.gets_to_end
@@ -393,15 +414,17 @@ module Invidious::Routes::Feeds
         published = Time.parse_rfc3339(entry.xpath_node("published").not_nil!.content)
         updated = Time.parse_rfc3339(entry.xpath_node("updated").not_nil!.content)
 
-        video = get_video(id, PG_DB, force_refresh: true)
+        video = get_video(id, force_refresh: true)
 
-        # Deliver notifications to `/api/v1/auth/notifications`
-        payload = {
-          "topic"     => video.ucid,
-          "videoId"   => video.id,
-          "published" => published.to_unix,
-        }.to_json
-        PG_DB.exec("NOTIFY notifications, E'#{payload}'")
+        if CONFIG.enable_user_notifications
+          # Deliver notifications to `/api/v1/auth/notifications`
+          payload = {
+            "topic"     => video.ucid,
+            "videoId"   => video.id,
+            "published" => published.to_unix,
+          }.to_json
+          PG_DB.exec("NOTIFY notifications, E'#{payload}'")
+        end
 
         video = ChannelVideo.new({
           id:                 id,
@@ -416,13 +439,14 @@ module Invidious::Routes::Feeds
           views:              video.views,
         })
 
-        was_insert = PG_DB.query_one("INSERT INTO channel_videos VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-          ON CONFLICT (id) DO UPDATE SET title = $2, published = $3,
-          updated = $4, ucid = $5, author = $6, length_seconds = $7,
-          live_now = $8, premiere_timestamp = $9, views = $10 returning (xmax=0) as was_insert", *video.to_tuple, as: Bool)
-
-        PG_DB.exec("UPDATE users SET notifications = array_append(notifications, $1),
-          feed_needs_update = true WHERE $2 = ANY(subscriptions)", video.id, video.ucid) if was_insert
+        was_insert = Invidious::Database::ChannelVideos.insert(video, with_premiere_timestamp: true)
+        if was_insert
+          if CONFIG.enable_user_notifications
+            Invidious::Database::Users.add_notification(video)
+          else
+            Invidious::Database::Users.feed_needs_update(video)
+          end
+        end
       end
     end
 

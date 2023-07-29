@@ -1,5 +1,3 @@
-require "db"
-
 # See http://www.evanmiller.org/how-not-to-sort-by-average-rating.html
 def ci_lower_bound(pos, n)
   if n == 0
@@ -21,10 +19,17 @@ def elapsed_text(elapsed)
 end
 
 def decode_length_seconds(string)
-  length_seconds = string.gsub(/[^0-9:]/, "").split(":").map &.to_i
+  length_seconds = string.gsub(/[^0-9:]/, "")
+  return 0_i32 if length_seconds.empty?
+
+  length_seconds = length_seconds.split(":").map { |x| x.to_i? || 0 }
   length_seconds = [0] * (3 - length_seconds.size) + length_seconds
-  length_seconds = Time::Span.new hours: length_seconds[0], minutes: length_seconds[1], seconds: length_seconds[2]
-  length_seconds = length_seconds.total_seconds.to_i
+
+  length_seconds = Time::Span.new(
+    hours: length_seconds[0],
+    minutes: length_seconds[1],
+    seconds: length_seconds[2]
+  ).total_seconds.to_i32
 
   return length_seconds
 end
@@ -44,6 +49,24 @@ def recode_length_seconds(time)
 
     return text
   end
+end
+
+def decode_interval(string : String) : Time::Span
+  rawMinutes = string.try &.to_i32?
+
+  if !rawMinutes
+    hours = /(?<hours>\d+)h/.match(string).try &.["hours"].try &.to_i32
+    hours ||= 0
+
+    minutes = /(?<minutes>\d+)m(?!s)/.match(string).try &.["minutes"].try &.to_i32
+    minutes ||= 0
+
+    time = Time::Span.new(hours: hours, minutes: minutes)
+  else
+    time = Time::Span.new(minutes: rawMinutes)
+  end
+
+  return time
 end
 
 def decode_time(string)
@@ -88,24 +111,27 @@ def decode_date(string : String)
   else nil # Continue
   end
 
-  # String matches format "20 hours ago", "4 months ago"...
-  date = string.split(" ")[-3, 3]
-  delta = date[0].to_i
+  # String matches format "20 hours ago", "4 months ago", "20s ago", "15min ago"...
+  match = string.match(/(?<count>\d+) ?(?<span>[smhdwy]\w*) ago/)
 
-  case date[1]
-  when .includes? "second"
+  raise "Could not parse #{string}" if match.nil?
+
+  delta = match["count"].to_i
+
+  case match["span"]
+  when .starts_with? "s" # second(s)
     delta = delta.seconds
-  when .includes? "minute"
+  when .starts_with? "mi" # minute(s)
     delta = delta.minutes
-  when .includes? "hour"
+  when .starts_with? "h" # hour(s)
     delta = delta.hours
-  when .includes? "day"
+  when .starts_with? "d" # day(s)
     delta = delta.days
-  when .includes? "week"
+  when .starts_with? "w" # week(s)
     delta = delta.weeks
-  when .includes? "month"
+  when .starts_with? "mo" # month(s)
     delta = delta.months
-  when .includes? "year"
+  when .starts_with? "y" # year(s)
     delta = delta.years
   else
     raise "Could not parse #{string}"
@@ -118,51 +144,47 @@ def recode_date(time : Time, locale)
   span = Time.utc - time
 
   if span.total_days > 365.0
-    span = translate(locale, "`x` years", (span.total_days.to_i // 365).to_s)
+    return translate_count(locale, "generic_count_years", span.total_days.to_i // 365)
   elsif span.total_days > 30.0
-    span = translate(locale, "`x` months", (span.total_days.to_i // 30).to_s)
+    return translate_count(locale, "generic_count_months", span.total_days.to_i // 30)
   elsif span.total_days > 7.0
-    span = translate(locale, "`x` weeks", (span.total_days.to_i // 7).to_s)
+    return translate_count(locale, "generic_count_weeks", span.total_days.to_i // 7)
   elsif span.total_hours > 24.0
-    span = translate(locale, "`x` days", (span.total_days.to_i).to_s)
+    return translate_count(locale, "generic_count_days", span.total_days.to_i)
   elsif span.total_minutes > 60.0
-    span = translate(locale, "`x` hours", (span.total_hours.to_i).to_s)
+    return translate_count(locale, "generic_count_hours", span.total_hours.to_i)
   elsif span.total_seconds > 60.0
-    span = translate(locale, "`x` minutes", (span.total_minutes.to_i).to_s)
+    return translate_count(locale, "generic_count_minutes", span.total_minutes.to_i)
   else
-    span = translate(locale, "`x` seconds", (span.total_seconds.to_i).to_s)
+    return translate_count(locale, "generic_count_seconds", span.total_seconds.to_i)
   end
-
-  return span
 end
 
 def number_with_separator(number)
   number.to_s.reverse.gsub(/(\d{3})(?=\d)/, "\\1,").reverse
 end
 
-def short_text_to_number(short_text : String) : Int32
-  case short_text
-  when .ends_with? "M"
-    number = short_text.rstrip(" mM").to_f
-    number *= 1000000
-  when .ends_with? "K"
-    number = short_text.rstrip(" kK").to_f
-    number *= 1000
-  else
-    number = short_text.rstrip(" ")
+def short_text_to_number(short_text : String) : Int64
+  matches = /(?<number>\d+(\.\d+)?)\s?(?<suffix>[mMkKbB]?)/.match(short_text)
+  number = matches.try &.["number"].to_f || 0.0
+
+  case matches.try &.["suffix"].downcase
+  when "k" then number *= 1_000
+  when "m" then number *= 1_000_000
+  when "b" then number *= 1_000_000_000
   end
 
-  number = number.to_i
-
-  return number
+  return number.to_i64
+rescue ex
+  return 0_i64
 end
 
 def number_to_short_text(number)
-  seperated = number_with_separator(number).gsub(",", ".").split("")
-  text = seperated.first(2).join
+  separated = number_with_separator(number).gsub(",", ".").split("")
+  text = separated.first(2).join
 
-  if seperated[2]? && seperated[2] != "."
-    text += seperated[2]
+  if separated[2]? && separated[2] != "."
+    text += separated[2]
   end
 
   text = text.rchop(".0")
@@ -240,7 +262,7 @@ def get_referer(env, fallback = "/", unroll = true)
   end
 
   referer = referer.request_target
-  referer = "/" + referer.gsub(/[^\/?@&%=\-_.0-9a-zA-Z]/, "").lstrip("/\\")
+  referer = "/" + referer.gsub(/[^\/?@&%=\-_.:,0-9a-zA-Z]/, "").lstrip("/\\")
 
   if referer == env.request.path
     referer = fallback
@@ -289,8 +311,8 @@ def parse_range(range)
   end
 
   ranges = range.lchop("bytes=").split(',')
-  ranges.each do |range|
-    start_range, end_range = range.split('-')
+  ranges.each do |r|
+    start_range, end_range = r.split('-')
 
     start_range = start_range.to_i64? || 0_i64
     end_range = end_range.to_i64?
@@ -320,8 +342,8 @@ def fetch_random_instance
   instance_list.each do |data|
     # TODO Check if current URL is onion instance and use .onion types if so.
     if data[1]["type"] == "https"
-      # Instances can have statisitics disabled, which is an requirement of version validation.
-      # as_nil? doesn't exist. Thus we'll have to handle the error rasied if as_nil fails.
+      # Instances can have statistics disabled, which is an requirement of version validation.
+      # as_nil? doesn't exist. Thus we'll have to handle the error raised if as_nil fails.
       begin
         data[1]["stats"].as_nil
         next
@@ -361,4 +383,65 @@ def fetch_random_instance
   end
 
   return filtered_instance_list.sample(1)[0]
+end
+
+def reduce_uri(uri : URI | String, max_length : Int32 = 50, suffix : String = "…") : String
+  str = uri.to_s.sub(/^https?:\/\//, "")
+  if str.size > max_length
+    str = "#{str[0, max_length]}#{suffix}"
+  end
+  return str
+end
+
+# Get the html link from a NavigationEndpoint or an innertubeCommand
+def parse_link_endpoint(endpoint : JSON::Any, text : String, video_id : String)
+  if url = endpoint.dig?("urlEndpoint", "url").try &.as_s
+    url = URI.parse(url)
+    displayed_url = text
+
+    if url.host == "youtu.be"
+      url = "/watch?v=#{url.request_target.lstrip('/')}"
+    elsif url.host.nil? || url.host.not_nil!.ends_with?("youtube.com")
+      if url.path == "/redirect"
+        # Sometimes, links can be corrupted (why?) so make sure to fallback
+        # nicely. See https://github.com/iv-org/invidious/issues/2682
+        url = url.query_params["q"]? || ""
+        displayed_url = url
+      else
+        url = url.request_target
+        displayed_url = "youtube.com#{url}"
+      end
+    end
+
+    text = %(<a href="#{url}">#{reduce_uri(displayed_url)}</a>)
+  elsif watch_endpoint = endpoint.dig?("watchEndpoint")
+    start_time = watch_endpoint["startTimeSeconds"]?.try &.as_i
+    link_video_id = watch_endpoint["videoId"].as_s
+
+    url = "/watch?v=#{link_video_id}"
+    url += "&t=#{start_time}" if !start_time.nil?
+
+    # If the current video ID (passed through from the caller function)
+    # is the same as the video ID in the link, add HTML attributes for
+    # the JS handler function that bypasses page reload.
+    #
+    # See: https://github.com/iv-org/invidious/issues/3063
+    if link_video_id == video_id
+      start_time ||= 0
+      text = %(<a href="#{url}" data-onclick="jump_to_time" data-jump-time="#{start_time}">#{reduce_uri(text)}</a>)
+    else
+      text = %(<a href="#{url}">#{text}</a>)
+    end
+  elsif url = endpoint.dig?("commandMetadata", "webCommandMetadata", "url").try &.as_s
+    if text.starts_with?(/\s?[@#]/)
+      # Handle "pings" in comments and hasthags differently
+      # See:
+      #  - https://github.com/iv-org/invidious/issues/3038
+      #  - https://github.com/iv-org/invidious/issues/3062
+      text = %(<a href="#{url}">#{text}</a>)
+    else
+      text = %(<a href="#{url}">#{reduce_uri(text)}</a>)
+    end
+  end
+  return text
 end

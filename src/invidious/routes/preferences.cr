@@ -2,17 +2,17 @@
 
 module Invidious::Routes::PreferencesRoute
   def self.show(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
+    locale = env.get("preferences").as(Preferences).locale
 
     referer = get_referer(env)
 
     preferences = env.get("preferences").as(Preferences)
 
-    templated "preferences"
+    templated "user/preferences"
   end
 
   def self.update(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
+    locale = env.get("preferences").as(Preferences).locale
     referer = get_referer(env)
 
     video_loop = env.params.body["video_loop"]?.try &.as(String)
@@ -47,6 +47,10 @@ module Invidious::Routes::PreferencesRoute
     local ||= "off"
     local = local == "on"
 
+    watch_history = env.params.body["watch_history"]?.try &.as(String)
+    watch_history ||= "off"
+    watch_history = watch_history == "on"
+
     speed = env.params.body["speed"]?.try &.as(String).to_f32?
     speed ||= CONFIG.default_user_preferences.speed
 
@@ -69,6 +73,10 @@ module Invidious::Routes::PreferencesRoute
     vr_mode = env.params.body["vr_mode"]?.try &.as(String)
     vr_mode ||= "off"
     vr_mode = vr_mode == "on"
+
+    save_player_pos = env.params.body["save_player_pos"]?.try &.as(String)
+    save_player_pos ||= "off"
+    save_player_pos = save_player_pos == "on"
 
     show_nick = env.params.body["show_nick"]?.try &.as(String)
     show_nick ||= "off"
@@ -132,7 +140,7 @@ module Invidious::Routes::PreferencesRoute
     notifications_only ||= "off"
     notifications_only = notifications_only == "on"
 
-    # Convert to JSON and back again to take advantage of converters used for compatability
+    # Convert to JSON and back again to take advantage of converters used for compatibility
     preferences = Preferences.from_json({
       annotations:                 annotations,
       annotations_subscribed:      annotations_subscribed,
@@ -145,6 +153,7 @@ module Invidious::Routes::PreferencesRoute
       latest_only:                 latest_only,
       listen:                      listen,
       local:                       local,
+      watch_history:               watch_history,
       locale:                      locale,
       max_results:                 max_results,
       notifications_only:          notifications_only,
@@ -165,11 +174,13 @@ module Invidious::Routes::PreferencesRoute
       extend_desc:                 extend_desc,
       vr_mode:                     vr_mode,
       show_nick:                   show_nick,
-    }.to_json).to_json
+      save_player_pos:             save_player_pos,
+    }.to_json)
 
     if user = env.get? "user"
       user = user.as(User)
-      PG_DB.exec("UPDATE users SET preferences = $1 WHERE email = $2", preferences, user.email)
+      user.preferences = preferences
+      Invidious::Database::Users.update_preferences(user)
 
       if CONFIG.admins.includes? user.email
         CONFIG.default_user_preferences.default_home = env.params.body["admin_default_home"]?.try &.as(String) || CONFIG.default_user_preferences.default_home
@@ -208,26 +219,14 @@ module Invidious::Routes::PreferencesRoute
         File.write("config/config.yml", CONFIG.to_yaml)
       end
     else
-      if Kemal.config.ssl || CONFIG.https_only
-        secure = true
-      else
-        secure = false
-      end
-
-      if CONFIG.domain
-        env.response.cookies["PREFS"] = HTTP::Cookie.new(name: "PREFS", domain: "#{CONFIG.domain}", value: URI.encode_www_form(preferences), expires: Time.utc + 2.years,
-          secure: secure, http_only: true)
-      else
-        env.response.cookies["PREFS"] = HTTP::Cookie.new(name: "PREFS", value: URI.encode_www_form(preferences), expires: Time.utc + 2.years,
-          secure: secure, http_only: true)
-      end
+      env.response.cookies["PREFS"] = Invidious::User::Cookies.prefs(CONFIG.domain, preferences)
     end
 
     env.redirect referer
   end
 
   def self.toggle_theme(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
+    locale = env.get("preferences").as(Preferences).locale
     referer = get_referer(env, unroll: false)
 
     redirect = env.params.query["redirect"]?
@@ -236,18 +235,15 @@ module Invidious::Routes::PreferencesRoute
 
     if user = env.get? "user"
       user = user.as(User)
-      preferences = user.preferences
 
-      case preferences.dark_mode
+      case user.preferences.dark_mode
       when "dark"
-        preferences.dark_mode = "light"
+        user.preferences.dark_mode = "light"
       else
-        preferences.dark_mode = "dark"
+        user.preferences.dark_mode = "dark"
       end
 
-      preferences = preferences.to_json
-
-      PG_DB.exec("UPDATE users SET preferences = $1 WHERE email = $2", preferences, user.email)
+      Invidious::Database::Users.update_preferences(user)
     else
       preferences = env.get("preferences").as(Preferences)
 
@@ -258,21 +254,7 @@ module Invidious::Routes::PreferencesRoute
         preferences.dark_mode = "dark"
       end
 
-      preferences = preferences.to_json
-
-      if Kemal.config.ssl || CONFIG.https_only
-        secure = true
-      else
-        secure = false
-      end
-
-      if CONFIG.domain
-        env.response.cookies["PREFS"] = HTTP::Cookie.new(name: "PREFS", domain: "#{CONFIG.domain}", value: URI.encode_www_form(preferences), expires: Time.utc + 2.years,
-          secure: secure, http_only: true)
-      else
-        env.response.cookies["PREFS"] = HTTP::Cookie.new(name: "PREFS", value: URI.encode_www_form(preferences), expires: Time.utc + 2.years,
-          secure: secure, http_only: true)
-      end
+      env.response.cookies["PREFS"] = Invidious::User::Cookies.prefs(CONFIG.domain, preferences)
     end
 
     if redirect
@@ -281,5 +263,79 @@ module Invidious::Routes::PreferencesRoute
       env.response.content_type = "application/json"
       "{}"
     end
+  end
+
+  def self.data_control(env)
+    locale = env.get("preferences").as(Preferences).locale
+
+    user = env.get? "user"
+    referer = get_referer(env)
+
+    if !user
+      return env.redirect referer
+    end
+
+    user = user.as(User)
+
+    templated "user/data_control"
+  end
+
+  def self.update_data_control(env)
+    locale = env.get("preferences").as(Preferences).locale
+
+    user = env.get? "user"
+    referer = get_referer(env)
+
+    if user
+      user = user.as(User)
+
+      # TODO: Find a way to prevent browser timeout
+
+      HTTP::FormData.parse(env.request) do |part|
+        body = part.body.gets_to_end
+        type = part.headers["Content-Type"]
+
+        next if body.empty?
+
+        # TODO: Unify into single import based on content-type
+        case part.name
+        when "import_invidious"
+          Invidious::User::Import.from_invidious(user, body)
+        when "import_youtube"
+          filename = part.filename || ""
+          success = Invidious::User::Import.from_youtube(user, body, filename, type)
+
+          if !success
+            haltf(env, status_code: 415,
+              response: error_template(415, "Invalid subscription file uploaded")
+            )
+          end
+        when "import_youtube_pl"
+          filename = part.filename || ""
+          success = Invidious::User::Import.from_youtube_pl(user, body, filename, type)
+
+          if !success
+            haltf(env, status_code: 415,
+              response: error_template(415, "Invalid playlist file uploaded")
+            )
+          end
+        when "import_freetube"
+          Invidious::User::Import.from_freetube(user, body)
+        when "import_newpipe_subscriptions"
+          Invidious::User::Import.from_newpipe_subs(user, body)
+        when "import_newpipe"
+          success = Invidious::User::Import.from_newpipe(user, body)
+
+          if !success
+            haltf(env, status_code: 415,
+              response: error_template(415, "Uploaded file is too large")
+            )
+          end
+        else nil # Ignore
+        end
+      end
+    end
+
+    env.redirect referer
   end
 end

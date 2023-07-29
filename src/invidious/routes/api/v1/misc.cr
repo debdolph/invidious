@@ -1,22 +1,19 @@
 module Invidious::Routes::API::V1::Misc
   # Stats API endpoint for Invidious
   def self.stats(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
     env.response.content_type = "application/json"
 
     if !CONFIG.statistics_enabled
-      return error_json(400, "Statistics are not enabled.")
+      return {"software" => SOFTWARE}.to_json
+    else
+      return Invidious::Jobs::StatisticsRefreshJob::STATISTICS.to_json
     end
-
-    Invidious::Jobs::StatisticsRefreshJob::STATISTICS.to_json
   end
 
   # APIv1 currently uses the same logic for both
   # user playlists and Invidious playlists. This means that we can't
   # reasonably split them yet. This should be addressed in APIv2
-  def self.get_playlist(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
-
+  def self.get_playlist(env : HTTP::Server::Context)
     env.response.content_type = "application/json"
     plid = env.params.url["plid"]
 
@@ -34,7 +31,7 @@ module Invidious::Routes::API::V1::Misc
     end
 
     begin
-      playlist = get_playlist(PG_DB, plid, locale)
+      playlist = get_playlist(plid)
     rescue ex : InfoException
       return error_json(404, ex)
     rescue ex
@@ -49,7 +46,7 @@ module Invidious::Routes::API::V1::Misc
     # includes into the playlist a maximum of 20 videos, before the offset
     if offset > 0
       lookback = offset < 50 ? offset : 50
-      response = playlist.to_json(offset - lookback, locale)
+      response = playlist.to_json(offset - lookback)
       json_response = JSON.parse(response)
     else
       #  Unless the continuation is really the offset 0, it becomes expensive.
@@ -58,13 +55,13 @@ module Invidious::Routes::API::V1::Misc
       #  it shouldn't happen often though
 
       lookback = 0
-      response = playlist.to_json(offset, locale, video_id: video_id)
+      response = playlist.to_json(offset, video_id: video_id)
       json_response = JSON.parse(response)
 
       if json_response["videos"].as_a[0]["index"] != offset
         offset = json_response["videos"].as_a[0]["index"].as_i
         lookback = offset < 50 ? offset : 50
-        response = playlist.to_json(offset - lookback, locale)
+        response = playlist.to_json(offset - lookback)
         json_response = JSON.parse(response)
       end
     end
@@ -84,7 +81,7 @@ module Invidious::Routes::API::V1::Misc
   end
 
   def self.mixes(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
+    locale = env.get("preferences").as(Preferences).locale
 
     env.response.content_type = "application/json"
 
@@ -127,7 +124,7 @@ module Invidious::Routes::API::V1::Misc
 
                 json.field "videoThumbnails" do
                   json.array do
-                    generate_thumbnails(json, video.id)
+                    Invidious::JSONify::APIv1.thumbnails(json, video.id)
                   end
                 end
 
@@ -152,5 +149,32 @@ module Invidious::Routes::API::V1::Misc
     end
 
     response
+  end
+
+  # resolve channel and clip urls, return the UCID
+  def self.resolve_url(env)
+    env.response.content_type = "application/json"
+    url = env.params.query["url"]?
+
+    return error_json(400, "Missing URL to resolve") if !url
+
+    begin
+      resolved_url = YoutubeAPI.resolve_url(url.as(String))
+      endpoint = resolved_url["endpoint"]
+      pageType = endpoint.dig?("commandMetadata", "webCommandMetadata", "webPageType").try &.as_s || ""
+      if resolved_ucid = endpoint.dig?("watchEndpoint", "videoId")
+      elsif resolved_ucid = endpoint.dig?("browseEndpoint", "browseId")
+      elsif pageType == "WEB_PAGE_TYPE_UNKNOWN"
+        return error_json(400, "Unknown url")
+      end
+    rescue ex
+      return error_json(500, ex)
+    end
+    JSON.build do |json|
+      json.object do
+        json.field "ucid", resolved_ucid.try &.as_s || ""
+        json.field "pageType", pageType
+      end
+    end
   end
 end

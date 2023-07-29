@@ -20,7 +20,7 @@
   <a href="https://hosted.weblate.org/engage/invidious/">
     <img alt="Translation Status" src="https://hosted.weblate.org/widgets/invidious/-/translations/svg-badge.svg">
   </a>
-  
+
   <a href="https://github.com/humanetech-community/awesome-humane-tech">
     <img alt="Awesome Humane Tech" src="https://raw.githubusercontent.com/humanetech-community/awesome-humane-tech/main/humane-tech-badge.svg?sanitize=true">
   </a>
@@ -28,21 +28,31 @@
   <h3>An open source alternative front-end to YouTube</h3>
 
   <a href="https://invidious.io/">Website</a>
-  &nbsp;•&nbsp; 
+  &nbsp;•&nbsp;
   <a href="https://instances.invidious.io/">Instances list</a>
-  &nbsp;•&nbsp; 
+  &nbsp;•&nbsp;
+  <a href="https://docs.invidious.io/faq/">FAQ</a>
+  &nbsp;•&nbsp;
   <a href="https://docs.invidious.io/">Documentation</a>
   &nbsp;•&nbsp;
   <a href="#contribute">Contribute</a>
   &nbsp;•&nbsp;
   <a href="https://invidious.io/donate/">Donate</a>
-  
+
   <h5>Chat with us:</h5>
   <a href="https://matrix.to/#/#invidious:matrix.org">
     <img alt="Matrix" src="https://img.shields.io/matrix/invidious:matrix.org?label=Matrix&color=darkgreen">
   </a>
   <a href="https://web.libera.chat/?channel=#invidious">
     <img alt="Libera.chat (IRC)" src="https://img.shields.io/badge/IRC%20%28Libera.chat%29-%23invidious-darkgreen">
+  </a>
+  <br>
+  <a rel="me" href="https://social.tchncs.de/@invidious">
+  <img alt="Fediverse: @invidious@social.tchncs.de" src="https://img.shields.io/badge/Fediverse-%40invidious%40social.tchncs.de-darkgreen">
+  </a>
+  <br>
+  <a href="https://invidious.io/contact/">
+  <img alt="E-mail" src="https://img.shields.io/badge/E%2d%2dmail-darkgreen">
   </a>
 </div>
 
@@ -78,7 +88,7 @@
 
 **Technical features**
 - Embedded video support
-- [Developer API](https://docs.invidious.io/API.md)
+- [Developer API](https://docs.invidious.io/api/)
 - Does not use official YouTube APIs
 - No Contributor License Agreement (CLA)
 
@@ -91,7 +101,7 @@
 
 **Hosting invidious:**
 
-- [Follow the installation instructions](https://docs.invidious.io/Installation.md)
+- [Follow the installation instructions](https://docs.invidious.io/installation/)
 
 
 ## Documentation
@@ -109,7 +119,7 @@ embedded youtube videos on other websites with invidious.
 
 The documentation contains a list of browser extensions that we recommended to use along with Invidious.
 
-You can read more here: https://docs.invidious.io/Extensions.md
+You can read more here: https://docs.invidious.io/applications/
 
 
 ## Contribute
@@ -137,9 +147,15 @@ Weblate also allows you to log-in with major SSO providers like Github, Gitlab, 
 
 - [FreeTube](https://github.com/FreeTubeApp/FreeTube): A libre software YouTube app for privacy.
 - [CloudTube](https://sr.ht/~cadence/tube/): A JavaScript-rich alternate YouTube player.
-- [PeerTubeify](https://gitlab.com/Cha_deL/peertubeify): On YouTube, displays a link to the same video on PeerTube, if it exists.
+- [PeerTubeify](https://gitlab.com/Cha_de_L/peertubeify): On YouTube, displays a link to the same video on PeerTube, if it exists.
 - [MusicPiped](https://github.com/deep-gaurav/MusicPiped): A material design music player that streams music from YouTube.
-- [HoloPlay](https://github.com/stephane-r/HoloPlay): Funny Android application connecting on Invidious API's with search, playlists and favorites.
+- [HoloPlay](https://github.com/stephane-r/holoplay-wa): Progressive Web App connecting on Invidious API's with search, playlists and favorites.
+- [WatchTube](https://github.com/WatchTubeTeam/WatchTube): Powerful YouTube client for Apple Watch.
+- [Yattee](https://github.com/yattee/yattee): Alternative YouTube frontend for iPhone, iPad, Mac and Apple TV.
+- [TubiTui](https://codeberg.org/777/TubiTui): A lightweight, libre, TUI-based YouTube client.
+- [Ytfzf](https://github.com/pystardust/ytfzf): A posix script to find and watch youtube videos from the terminal. (Without API).
+- [Playlet](https://github.com/iBicha/playlet): Unofficial Youtube client for Roku TV.
+- [Clipious](https://github.com/lamarios/clipious): Unofficial Invidious client for Android.
 
 
 ## Liability

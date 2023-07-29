@@ -1,31 +1,35 @@
 module Invidious::Routes::API::V1::Videos
   def self.videos(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
+    locale = env.get("preferences").as(Preferences).locale
 
     env.response.content_type = "application/json"
 
     id = env.params.url["id"]
     region = env.params.query["region"]?
+    proxy = {"1", "true"}.any? &.== env.params.query["local"]?
 
     begin
-      video = get_video(id, PG_DB, region: region)
-    rescue ex : VideoRedirect
-      env.response.headers["Location"] = env.request.resource.gsub(id, ex.video_id)
-      return error_json(302, "Video is unavailable", {"videoId" => ex.video_id})
+      video = get_video(id, region: region)
+    rescue ex : NotFoundException
+      return error_json(404, ex)
     rescue ex
       return error_json(500, ex)
     end
 
-    video.to_json(locale, nil)
+    return JSON.build do |json|
+      Invidious::JSONify::APIv1.video(video, json, locale: locale, proxy: proxy)
+    end
   end
 
   def self.captions(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
-
     env.response.content_type = "application/json"
 
     id = env.params.url["id"]
-    region = env.params.query["region"]?
+    region = env.params.query["region"]? || env.params.body["region"]?
+
+    if id.nil? || id.size != 11 || !id.matches?(/^[\w-]+$/)
+      return error_json(400, "Invalid video ID")
+    end
 
     # See https://github.com/ytdl-org/youtube-dl/blob/6ab30ff50bf6bd0585927cb73c7421bef184f87a/youtube_dl/extractor/youtube.py#L1354
     # It is possible to use `/api/timedtext?type=list&v=#{id}` and
@@ -36,10 +40,9 @@ module Invidious::Routes::API::V1::Videos
     # getting video info.
 
     begin
-      video = get_video(id, PG_DB, region: region)
-    rescue ex : VideoRedirect
-      env.response.headers["Location"] = env.request.resource.gsub(id, ex.video_id)
-      return error_json(302, "Video is unavailable", {"videoId" => ex.video_id})
+      video = get_video(id, region: region)
+    rescue ex : NotFoundException
+      haltf env, 404
     rescue ex
       haltf env, 500
     end
@@ -73,9 +76,9 @@ module Invidious::Routes::API::V1::Videos
     env.response.content_type = "text/vtt; charset=UTF-8"
 
     if lang
-      caption = captions.select { |caption| caption.language_code == lang }
+      caption = captions.select(&.language_code.== lang)
     else
-      caption = captions.select { |caption| caption.name == label }
+      caption = captions.select(&.name.== label)
     end
 
     if caption.empty?
@@ -90,49 +93,65 @@ module Invidious::Routes::API::V1::Videos
     # as well as some other markup that makes it cumbersome, so we try to fix that here
     if caption.name.includes? "auto-generated"
       caption_xml = YT_POOL.client &.get(url).body
-      caption_xml = XML.parse(caption_xml)
 
-      webvtt = String.build do |str|
-        str << <<-END_VTT
-        WEBVTT
-        Kind: captions
-        Language: #{tlang || caption.language_code}
+      if caption_xml.starts_with?("<?xml")
+        webvtt = caption.timedtext_to_vtt(caption_xml, tlang)
+      else
+        caption_xml = XML.parse(caption_xml)
+
+        webvtt = String.build do |str|
+          str << <<-END_VTT
+          WEBVTT
+          Kind: captions
+          Language: #{tlang || caption.language_code}
 
 
-        END_VTT
+          END_VTT
 
-        caption_nodes = caption_xml.xpath_nodes("//transcript/text")
-        caption_nodes.each_with_index do |node, i|
-          start_time = node["start"].to_f.seconds
-          duration = node["dur"]?.try &.to_f.seconds
-          duration ||= start_time
+          caption_nodes = caption_xml.xpath_nodes("//transcript/text")
+          caption_nodes.each_with_index do |node, i|
+            start_time = node["start"].to_f.seconds
+            duration = node["dur"]?.try &.to_f.seconds
+            duration ||= start_time
 
-          if caption_nodes.size > i + 1
-            end_time = caption_nodes[i + 1]["start"].to_f.seconds
-          else
-            end_time = start_time + duration
+            if caption_nodes.size > i + 1
+              end_time = caption_nodes[i + 1]["start"].to_f.seconds
+            else
+              end_time = start_time + duration
+            end
+
+            start_time = "#{start_time.hours.to_s.rjust(2, '0')}:#{start_time.minutes.to_s.rjust(2, '0')}:#{start_time.seconds.to_s.rjust(2, '0')}.#{start_time.milliseconds.to_s.rjust(3, '0')}"
+            end_time = "#{end_time.hours.to_s.rjust(2, '0')}:#{end_time.minutes.to_s.rjust(2, '0')}:#{end_time.seconds.to_s.rjust(2, '0')}.#{end_time.milliseconds.to_s.rjust(3, '0')}"
+
+            text = HTML.unescape(node.content)
+            text = text.gsub(/<font color="#[a-fA-F0-9]{6}">/, "")
+            text = text.gsub(/<\/font>/, "")
+            if md = text.match(/(?<name>.*) : (?<text>.*)/)
+              text = "<v #{md["name"]}>#{md["text"]}</v>"
+            end
+
+            str << <<-END_CUE
+            #{start_time} --> #{end_time}
+            #{text}
+
+
+            END_CUE
           end
-
-          start_time = "#{start_time.hours.to_s.rjust(2, '0')}:#{start_time.minutes.to_s.rjust(2, '0')}:#{start_time.seconds.to_s.rjust(2, '0')}.#{start_time.milliseconds.to_s.rjust(3, '0')}"
-          end_time = "#{end_time.hours.to_s.rjust(2, '0')}:#{end_time.minutes.to_s.rjust(2, '0')}:#{end_time.seconds.to_s.rjust(2, '0')}.#{end_time.milliseconds.to_s.rjust(3, '0')}"
-
-          text = HTML.unescape(node.content)
-          text = text.gsub(/<font color="#[a-fA-F0-9]{6}">/, "")
-          text = text.gsub(/<\/font>/, "")
-          if md = text.match(/(?<name>.*) : (?<text>.*)/)
-            text = "<v #{md["name"]}>#{md["text"]}</v>"
-          end
-
-          str << <<-END_CUE
-          #{start_time} --> #{end_time}
-          #{text}
-
-
-          END_CUE
         end
       end
     else
+      # Some captions have "align:[start/end]" and "position:[num]%"
+      # attributes. Those are causing issues with VideoJS, which is unable
+      # to properly align the captions on the video, so we remove them.
+      #
+      # See: https://github.com/iv-org/invidious/issues/2391
       webvtt = YT_POOL.client &.get("#{url}&format=vtt").body
+      if webvtt.starts_with?("<?xml")
+        webvtt = caption.timedtext_to_vtt(webvtt)
+      else
+        webvtt = YT_POOL.client &.get("#{url}&format=vtt").body
+          .gsub(/([0-9:.]{12} --> [0-9:.]{12}).+/, "\\1")
+      end
     end
 
     if title = env.params.query["title"]?
@@ -149,18 +168,15 @@ module Invidious::Routes::API::V1::Videos
   # thumbnails for individual scenes in a video.
   # See https://support.jwplayer.com/articles/how-to-add-preview-thumbnails
   def self.storyboards(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
-
     env.response.content_type = "application/json"
 
     id = env.params.url["id"]
     region = env.params.query["region"]?
 
     begin
-      video = get_video(id, PG_DB, region: region)
-    rescue ex : VideoRedirect
-      env.response.headers["Location"] = env.request.resource.gsub(id, ex.video_id)
-      return error_json(302, "Video is unavailable", {"videoId" => ex.video_id})
+      video = get_video(id, region: region)
+    rescue ex : NotFoundException
+      haltf env, 404
     rescue ex
       haltf env, 500
     end
@@ -173,7 +189,7 @@ module Invidious::Routes::API::V1::Videos
       response = JSON.build do |json|
         json.object do
           json.field "storyboards" do
-            generate_storyboards(json, id, storyboards)
+            Invidious::JSONify::APIv1.storyboards(json, id, storyboards)
           end
         end
       end
@@ -183,7 +199,7 @@ module Invidious::Routes::API::V1::Videos
 
     env.response.content_type = "text/vtt"
 
-    storyboard = storyboards.select { |storyboard| width == "#{storyboard[:width]}" || height == "#{storyboard[:height]}" }
+    storyboard = storyboards.select { |sb| width == "#{sb[:width]}" || height == "#{sb[:height]}" }
 
     if storyboard.empty?
       haltf env, 404
@@ -223,8 +239,6 @@ module Invidious::Routes::API::V1::Videos
   end
 
   def self.annotations(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
-
     env.response.content_type = "text/xml"
 
     id = env.params.url["id"]
@@ -239,7 +253,7 @@ module Invidious::Routes::API::V1::Videos
 
     case source
     when "archive"
-      if CONFIG.cache_annotations && (cached_annotation = PG_DB.query_one?("SELECT * FROM annotations WHERE id = $1", id, as: Annotation))
+      if CONFIG.cache_annotations && (cached_annotation = Invidious::Database::Annotations.select(id))
         annotations = cached_annotation.annotations
       else
         index = CHARS_SAFE.index(id[0]).not_nil!.to_s.rjust(2, '0')
@@ -271,7 +285,7 @@ module Invidious::Routes::API::V1::Videos
 
         annotations = response.body
 
-        cache_annotation(PG_DB, id, annotations)
+        cache_annotation(id, annotations)
       end
     else # "youtube"
       response = YT_POOL.client &.get("/annotations_invideo?video_id=#{id}")
@@ -293,7 +307,7 @@ module Invidious::Routes::API::V1::Videos
   end
 
   def self.comments(env)
-    locale = LOCALES[env.get("preferences").as(Preferences).locale]?
+    locale = env.get("preferences").as(Preferences).locale
     region = env.params.query["region"]?
 
     env.response.content_type = "application/json"
@@ -319,7 +333,9 @@ module Invidious::Routes::API::V1::Videos
       sort_by ||= "top"
 
       begin
-        comments = fetch_youtube_comments(id, continuation, format, locale, thin_mode, region, sort_by: sort_by)
+        comments = Comments.fetch_youtube(id, continuation, format, locale, thin_mode, region, sort_by: sort_by)
+      rescue ex : NotFoundException
+        return error_json(404, ex)
       rescue ex
         return error_json(500, ex)
       end
@@ -329,19 +345,14 @@ module Invidious::Routes::API::V1::Videos
       sort_by ||= "confidence"
 
       begin
-        comments, reddit_thread = fetch_reddit_comments(id, sort_by: sort_by)
-        content_html = template_reddit_comments(comments, locale)
-
-        content_html = fill_links(content_html, "https", "www.reddit.com")
-        content_html = replace_links(content_html)
+        comments, reddit_thread = Comments.fetch_reddit(id, sort_by: sort_by)
       rescue ex
         comments = nil
         reddit_thread = nil
-        content_html = ""
       end
 
       if !reddit_thread || !comments
-        haltf env, 404
+        return error_json(404, "No reddit threads found")
       end
 
       if format == "json"
@@ -350,6 +361,9 @@ module Invidious::Routes::API::V1::Videos
 
         return reddit_thread.to_json
       else
+        content_html = Frontend::Comments.template_reddit(comments, locale)
+        content_html = Comments.fill_links(content_html, "https", "www.reddit.com")
+        content_html = Comments.replace_links(content_html)
         response = {
           "title"       => reddit_thread.title,
           "permalink"   => reddit_thread.permalink,

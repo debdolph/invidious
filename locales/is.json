@@ -1,16 +1,4 @@
 {
-    "`x` subscribers": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` áskrifandar",
-        "": "`x` áskrifendur"
-    },
-    "`x` videos": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` myndband",
-        "": "`x` myndbönd"
-    },
-    "`x` playlists": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` spilunarlist",
-        "": "`x` spilunarlistar"
-    },
     "LIVE": "BEINT",
     "Shared `x` ago": "Deilt `x` síðan",
     "Unsubscribe": "Afskrá",
@@ -26,7 +14,6 @@
     "Clear watch history?": "Hreinsa áhorfssögu?",
     "New password": "Nýtt lykilorð",
     "New passwords must match": "Nýtt lykilorð verður að passa",
-    "Cannot change password for Google accounts": "Ekki er hægt að breyta lykilorði fyrir Google reikninga",
     "Authorize token?": "Leyfa tákn?",
     "Authorize token for `x`?": "Leyfa tákn fyrir `x`?",
     "Yes": "Já",
@@ -49,7 +36,6 @@
     "source": "uppspretta",
     "Log in": "Skrá inn",
     "Log in/register": "Innskráning/nýskráning",
-    "Log in with Google": "Skrá inn með Google",
     "User ID": "Notandakenni",
     "Password": "Lykilorð",
     "Time (h:mm:ss):": "Tími (h:mm: ss):",
@@ -58,7 +44,6 @@
     "Sign In": "Skrá inn",
     "Register": "Nýskrá",
     "E-mail": "Tölvupóstur",
-    "Google verification code": "Google staðfestingarkóði",
     "Preferences": "Kjörstillingar",
     "preferences_category_player": "Kjörstillingar spilara",
     "preferences_video_loop_label": "Alltaf lykkja: ",
@@ -122,22 +107,10 @@
     "Subscription manager": "Áskriftarstjóri",
     "Token manager": "Táknstjóri",
     "Token": "Tákn",
-    "`x` subscriptions": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` áskriftur",
-        "": "`x` áskriftir"
-    },
-    "`x` tokens": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` tákn",
-        "": "`x` tákn"
-    },
     "Import/export": "Flytja inn/út",
     "unsubscribe": "afskrá",
     "revoke": "afturkalla",
     "Subscriptions": "Áskriftir",
-    "`x` unseen notifications": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` óséðar tilkynning",
-        "": "`x` óséðar tilkynningar"
-    },
     "search": "leita",
     "Log out": "Útskrá",
     "Source available here.": "Frumkóði aðgengilegur hér.",
@@ -166,10 +139,6 @@
     "Whitelisted regions: ": "Svæði á hvítum lista: ",
     "Blacklisted regions: ": "Svæði á svörtum lista: ",
     "Shared `x`": "Deilt `x`",
-    "`x` views": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` áhorf",
-        "": "`x` áhorf"
-    },
     "Premieres in `x`": "Frumflutt eftir `x`",
     "Premieres `x`": "Frumflutt `x`",
     "Hi! Looks like you have JavaScript turned off. Click here to view comments, keep in mind they may take a bit longer to load.": "Hæ! Lítur út eins og þú hafir slökkt á JavaScript. Smelltu hér til að skoða ummæli, hafðu í huga að þær geta tekið aðeins lengri tíma að hlaða.",
@@ -183,17 +152,12 @@
     "Hide replies": "Fela svör",
     "Show replies": "Sýna svör",
     "Incorrect password": "Rangt lykilorð",
-    "Quota exceeded, try again in a few hours": "Kvóti fór yfir, reyndu aftur eftir nokkrar klukkustundir",
-    "Unable to log in, make sure two-factor authentication (Authenticator or SMS) is turned on.": "Ekki er hægt að skrá þig inn, vertu viss um að tvíþætt staðfesting (Authenticator eða SMS) sé kveikt á.",
-    "Invalid TFA code": "Ógildur TFA kóði",
-    "Login failed. This may be because two-factor authentication is not turned on for your account.": "Innskráning mistókst. Þetta gæti verið vegna þess að tvíþátta staðfesting er ekki kveikt á reikningnum þínum.",
     "Wrong answer": "Rangt svar",
     "Erroneous CAPTCHA": "Rangt CAPTCHA",
     "CAPTCHA is a required field": "CAPTCHA er nauðsynlegur reitur",
     "User ID is a required field": "Notandakenni er nauðsynlegur reitur",
     "Password is a required field": "Lykilorð er nauðsynlegur reitur",
     "Wrong username or password": "Rangt notandanafn eða lykilorð",
-    "Please sign in using 'Log in with Google'": "Vinsamlegast skráðu þig inn með því að nota 'Innskráning með Google'",
     "Password cannot be empty": "Lykilorð má ekki vera autt",
     "Password cannot be longer than 55 characters": "Lykilorð má ekki vera lengra en 55 stafir",
     "Please log in": "Vinsamlegast skráðu þig inn",
@@ -203,16 +167,8 @@
     "This channel does not exist.": "Þessi rás er ekki til.",
     "Could not get channel info.": "Ekki tókst að fá rásarupplýsingar.",
     "Could not fetch comments": "Ekki tókst að sækja ummæli",
-    "View `x` replies": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "Skoða `x` svar",
-        "": "Skoða `x` svör"
-    },
     "`x` ago": "`x` síðan",
     "Load more": "Hlaða meira",
-    "`x` points": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` stig",
-        "": "`x` stig"
-    },
     "Could not create mix.": "Ekki tókst að búa til blöndu.",
     "Empty playlist": "Tómur spilunarlisti",
     "Not a playlist.": "Ekki spilunarlisti.",
@@ -330,34 +286,6 @@
     "Yiddish": "Jiddíska",
     "Yoruba": "Jórúba",
     "Zulu": "Zúlú",
-    "`x` years": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` ár",
-        "": "`x` ár"
-    },
-    "`x` months": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` mánuð",
-        "": "`x` mánuði"
-    },
-    "`x` weeks": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` vika",
-        "": "`x` vikur"
-    },
-    "`x` days": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` dagur",
-        "": "`x` dagar"
-    },
-    "`x` hours": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` klukkustund",
-        "": "`x` klukkustundir"
-    },
-    "`x` minutes": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` mínúta",
-        "": "`x` mínútur"
-    },
-    "`x` seconds": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` sekúnda",
-        "": "`x` sekúndur"
-    },
     "Fallback comments: ": "Vara ummæli: ",
     "Popular": "Vinsælt",
     "Top": "Topp",
@@ -379,8 +307,9 @@
     "`x` marked it with a ❤": "`x` merkti það með ❤",
     "Audio mode": "Hljóð ham",
     "Video mode": "Myndband ham",
-    "Videos": "Myndbönd",
+    "channel_tab_videos_label": "Myndbönd",
     "Playlists": "Spilunarlistar",
-    "Community": "Samfélag",
-    "Current version: ": "Núverandi útgáfa: "
+    "channel_tab_community_label": "Samfélag",
+    "Current version: ": "Núverandi útgáfa: ",
+    "preferences_watch_history_label": "Virkja áhorfssögu: "
 }

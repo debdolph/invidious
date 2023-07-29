@@ -29,7 +29,7 @@ struct ChannelVideo
       json.field "title", self.title
       json.field "videoId", self.id
       json.field "videoThumbnails" do
-        generate_thumbnails(json, self.id)
+        Invidious::JSONify::APIv1.thumbnails(json, self.id)
       end
 
       json.field "lengthSeconds", self.length_seconds
@@ -44,13 +44,9 @@ struct ChannelVideo
     end
   end
 
-  def to_json(locale, json : JSON::Builder | Nil = nil)
-    if json
+  def to_json(locale, _json : Nil = nil)
+    JSON.build do |json|
       to_json(locale, json)
-    else
-      JSON.build do |json|
-        to_json(locale, json)
-      end
     end
   end
 
@@ -88,13 +84,9 @@ struct ChannelVideo
     end
   end
 
-  def to_xml(locale, xml : XML::Builder | Nil = nil)
-    if xml
+  def to_xml(locale, _xml : Nil = nil)
+    XML.build do |xml|
       to_xml(locale, xml)
-    else
-      XML.build do |xml|
-        to_xml(locale, xml)
-      end
     end
   end
 
@@ -114,8 +106,9 @@ class ChannelRedirect < Exception
   end
 end
 
-def get_batch_channels(channels, db, refresh = false, pull_all_videos = true, max_threads = 10)
+def get_batch_channels(channels)
   finished_channel = Channel(String | Nil).new
+  max_threads = 10
 
   spawn do
     active_threads = 0
@@ -130,7 +123,7 @@ def get_batch_channels(channels, db, refresh = false, pull_all_videos = true, ma
       active_threads += 1
       spawn do
         begin
-          get_channel(ucid, db, refresh, pull_all_videos)
+          get_channel(ucid)
           finished_channel.send(ucid)
         rescue ex
           finished_channel.send(nil)
@@ -151,37 +144,33 @@ def get_batch_channels(channels, db, refresh = false, pull_all_videos = true, ma
   return final
 end
 
-def get_channel(id, db, refresh = true, pull_all_videos = true)
-  if channel = db.query_one?("SELECT * FROM channels WHERE id = $1", id, as: InvidiousChannel)
-    if refresh && Time.utc - channel.updated > 10.minutes
-      channel = fetch_channel(id, db, pull_all_videos: pull_all_videos)
-      channel_array = channel.to_a
-      args = arg_array(channel_array)
+def get_channel(id) : InvidiousChannel
+  channel = Invidious::Database::Channels.select(id)
 
-      db.exec("INSERT INTO channels VALUES (#{args}) \
-        ON CONFLICT (id) DO UPDATE SET author = $2, updated = $3", args: channel_array)
-    end
-  else
-    channel = fetch_channel(id, db, pull_all_videos: pull_all_videos)
-    channel_array = channel.to_a
-    args = arg_array(channel_array)
-
-    db.exec("INSERT INTO channels VALUES (#{args})", args: channel_array)
+  if channel.nil? || (Time.utc - channel.updated) > 2.days
+    channel = fetch_channel(id, pull_all_videos: false)
+    Invidious::Database::Channels.insert(channel, update_on_conflict: true)
   end
 
   return channel
 end
 
-def fetch_channel(ucid, db, pull_all_videos = true, locale = nil)
+def fetch_channel(ucid, pull_all_videos : Bool)
   LOGGER.debug("fetch_channel: #{ucid}")
-  LOGGER.trace("fetch_channel: #{ucid} : pull_all_videos = #{pull_all_videos}, locale = #{locale}")
+  LOGGER.trace("fetch_channel: #{ucid} : pull_all_videos = #{pull_all_videos}")
+
+  namespaces = {
+    "yt"      => "http://www.youtube.com/xml/schemas/2015",
+    "media"   => "http://search.yahoo.com/mrss/",
+    "default" => "http://www.w3.org/2005/Atom",
+  }
 
   LOGGER.trace("fetch_channel: #{ucid} : Downloading RSS feed")
   rss = YT_POOL.client &.get("/feeds/videos.xml?channel_id=#{ucid}").body
   LOGGER.trace("fetch_channel: #{ucid} : Parsing RSS feed")
-  rss = XML.parse_html(rss)
+  rss = XML.parse(rss)
 
-  author = rss.xpath_node(%q(//feed/title))
+  author = rss.xpath_node("//default:feed/default:title", namespaces)
   if !author
     raise InfoException.new("Deleted or invalid channel")
   end
@@ -197,24 +186,39 @@ def fetch_channel(ucid, db, pull_all_videos = true, locale = nil)
 
   LOGGER.trace("fetch_channel: #{ucid} : author = #{author}, auto_generated = #{auto_generated}")
 
-  page = 1
+  channel = InvidiousChannel.new({
+    id:         ucid,
+    author:     author,
+    updated:    Time.utc,
+    deleted:    false,
+    subscribed: nil,
+  })
 
   LOGGER.trace("fetch_channel: #{ucid} : Downloading channel videos page")
-  initial_data = get_channel_videos_response(ucid, page, auto_generated: auto_generated)
-  videos = extract_videos(initial_data, author, ucid)
+  videos, continuation = IV::Channel::Tabs.get_videos(channel)
 
   LOGGER.trace("fetch_channel: #{ucid} : Extracting videos from channel RSS feed")
-  rss.xpath_nodes("//feed/entry").each do |entry|
-    video_id = entry.xpath_node("videoid").not_nil!.content
-    title = entry.xpath_node("title").not_nil!.content
-    published = Time.parse_rfc3339(entry.xpath_node("published").not_nil!.content)
-    updated = Time.parse_rfc3339(entry.xpath_node("updated").not_nil!.content)
-    author = entry.xpath_node("author/name").not_nil!.content
-    ucid = entry.xpath_node("channelid").not_nil!.content
-    views = entry.xpath_node("group/community/statistics").try &.["views"]?.try &.to_i64?
-    views ||= 0_i64
+  rss.xpath_nodes("//default:feed/default:entry", namespaces).each do |entry|
+    video_id = entry.xpath_node("yt:videoId", namespaces).not_nil!.content
+    title = entry.xpath_node("default:title", namespaces).not_nil!.content
 
-    channel_video = videos.select { |video| video.id == video_id }[0]?
+    published = Time.parse_rfc3339(
+      entry.xpath_node("default:published", namespaces).not_nil!.content
+    )
+    updated = Time.parse_rfc3339(
+      entry.xpath_node("default:updated", namespaces).not_nil!.content
+    )
+
+    author = entry.xpath_node("default:author/default:name", namespaces).not_nil!.content
+    ucid = entry.xpath_node("yt:channelId", namespaces).not_nil!.content
+
+    views = entry
+      .xpath_node("media:group/media:community/media:statistics", namespaces)
+      .try &.["views"]?.try &.to_i64? || 0_i64
+
+    channel_video = videos
+      .select(SearchVideo)
+      .select(&.id.== video_id)[0]?
 
     length_seconds = channel_video.try &.length_seconds
     length_seconds ||= 0
@@ -241,71 +245,60 @@ def fetch_channel(ucid, db, pull_all_videos = true, locale = nil)
 
     # We don't include the 'premiere_timestamp' here because channel pages don't include them,
     # meaning the above timestamp is always null
-    was_insert = db.query_one("INSERT INTO channel_videos VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) \
-      ON CONFLICT (id) DO UPDATE SET title = $2, published = $3, \
-      updated = $4, ucid = $5, author = $6, length_seconds = $7, \
-      live_now = $8, views = $10 returning (xmax=0) as was_insert", *video.to_tuple, as: Bool)
+    was_insert = Invidious::Database::ChannelVideos.insert(video)
 
     if was_insert
       LOGGER.trace("fetch_channel: #{ucid} : video #{video_id} : Inserted, updating subscriptions")
-      db.exec("UPDATE users SET notifications = array_append(notifications, $1), \
-        feed_needs_update = true WHERE $2 = ANY(subscriptions)", video.id, video.ucid)
+      if CONFIG.enable_user_notifications
+        Invidious::Database::Users.add_notification(video)
+      else
+        Invidious::Database::Users.feed_needs_update(video)
+      end
     else
       LOGGER.trace("fetch_channel: #{ucid} : video #{video_id} : Updated")
     end
   end
 
   if pull_all_videos
-    page += 1
-
-    ids = [] of String
-
     loop do
-      initial_data = get_channel_videos_response(ucid, page, auto_generated: auto_generated)
-      videos = extract_videos(initial_data, author, ucid)
+      # Keep fetching videos using the continuation token retrieved earlier
+      videos, continuation = IV::Channel::Tabs.get_videos(channel, continuation: continuation)
 
-      count = videos.size
-      videos = videos.map { |video| ChannelVideo.new({
-        id:                 video.id,
-        title:              video.title,
-        published:          video.published,
-        updated:            Time.utc,
-        ucid:               video.ucid,
-        author:             video.author,
-        length_seconds:     video.length_seconds,
-        live_now:           video.live_now,
-        premiere_timestamp: video.premiere_timestamp,
-        views:              video.views,
-      }) }
-
-      videos.each do |video|
-        ids << video.id
+      count = 0
+      videos.select(SearchVideo).each do |video|
+        count += 1
+        video = ChannelVideo.new({
+          id:                 video.id,
+          title:              video.title,
+          published:          video.published,
+          updated:            Time.utc,
+          ucid:               video.ucid,
+          author:             video.author,
+          length_seconds:     video.length_seconds,
+          live_now:           video.live_now,
+          premiere_timestamp: video.premiere_timestamp,
+          views:              video.views,
+        })
 
         # We are notified of Red videos elsewhere (PubSub), which includes a correct published date,
         # so since they don't provide a published date here we can safely ignore them.
         if Time.utc - video.published > 1.minute
-          was_insert = db.query_one("INSERT INTO channel_videos VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) \
-            ON CONFLICT (id) DO UPDATE SET title = $2, published = $3, \
-            updated = $4, ucid = $5, author = $6, length_seconds = $7, \
-            live_now = $8, views = $10 returning (xmax=0) as was_insert", *video.to_tuple, as: Bool)
-
-          db.exec("UPDATE users SET notifications = array_append(notifications, $1), \
-            feed_needs_update = true WHERE $2 = ANY(subscriptions)", video.id, video.ucid) if was_insert
+          was_insert = Invidious::Database::ChannelVideos.insert(video)
+          if was_insert
+            if CONFIG.enable_user_notifications
+              Invidious::Database::Users.add_notification(video)
+            else
+              Invidious::Database::Users.feed_needs_update(video)
+            end
+          end
         end
       end
 
       break if count < 25
-      page += 1
+      sleep 500.milliseconds
     end
   end
 
-  channel = InvidiousChannel.new({
-    id:         ucid,
-    author:     author,
-    updated:    Time.utc,
-    deleted:    false,
-    subscribed: nil,
-  })
-
+  channel.updated = Time.utc
   return channel
 end

@@ -1,16 +1,4 @@
 {
-    "`x` subscribers": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` prenumeranter",
-        "": "`x` prenumeranter"
-    },
-    "`x` videos": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` videor",
-        "": "`x` videor"
-    },
-    "`x` playlists": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` spellistor",
-        "": "`x` spellistor"
-    },
     "LIVE": "LIVE",
     "Shared `x` ago": "Delad `x` sedan",
     "Unsubscribe": "Avprenumerera",
@@ -26,7 +14,6 @@
     "Clear watch history?": "Töm visningshistorik?",
     "New password": "Nytt lösenord",
     "New passwords must match": "Nya lösenord måste stämma överens",
-    "Cannot change password for Google accounts": "Kan inte ändra lösenord på Google-konton",
     "Authorize token?": "Auktorisera åtkomsttoken?",
     "Authorize token for `x`?": "Auktorisera åtkomsttoken för `x`?",
     "Yes": "Ja",
@@ -49,7 +36,6 @@
     "source": "källa",
     "Log in": "Logga in",
     "Log in/register": "Logga in/registrera",
-    "Log in with Google": "Logga in med Google",
     "User ID": "Användar-ID",
     "Password": "Lösenord",
     "Time (h:mm:ss):": "Tid (h:mm:ss):",
@@ -58,7 +44,6 @@
     "Sign In": "Inloggning",
     "Register": "Registrera",
     "E-mail": "E-post",
-    "Google verification code": "Google-bekräftelsekod",
     "Preferences": "Inställningar",
     "preferences_category_player": "Spelarinställningar",
     "preferences_video_loop_label": "Loopa alltid: ",
@@ -126,22 +111,10 @@
     "Subscription manager": "Prenumerationshanterare",
     "Token manager": "Åtkomst-token-hanterare",
     "Token": "Åtkomst-token",
-    "`x` subscriptions": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` prenumerationer",
-        "": "`x` prenumerationer"
-    },
-    "`x` tokens": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` åtkomst-token",
-        "": "`x` åtkomst-token"
-    },
     "Import/export": "Importera/exportera",
     "unsubscribe": "avprenumerera",
     "revoke": "återkalla",
     "Subscriptions": "Prenumerationer",
-    "`x` unseen notifications": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` osedda aviseringar",
-        "": "`x` osedda aviseringar"
-    },
     "search": "sök",
     "Log out": "Logga ut",
     "Source available here.": "Källkod tillgänglig här.",
@@ -163,7 +136,6 @@
     "Show less": "Visa mindre",
     "Watch on YouTube": "Titta på YouTube",
     "Switch Invidious Instance": "Byt Invidious Instans",
-    "Broken? Try another Invidious Instance": "Trasig? Prova en annan Invidious Instance",
     "Hide annotations": "Dölj länkar-i-video",
     "Show annotations": "Visa länkar-i-video",
     "Genre: ": "Genre: ",
@@ -174,10 +146,6 @@
     "Whitelisted regions: ": "Vitlistade regioner: ",
     "Blacklisted regions: ": "Svartlistade regioner: ",
     "Shared `x`": "Delade `x`",
-    "`x` views": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` visningar",
-        "": "`x` visningar"
-    },
     "Premieres in `x`": "Premiär om `x`",
     "Premieres `x`": "Premiär av `x`",
     "Hi! Looks like you have JavaScript turned off. Click here to view comments, keep in mind they may take a bit longer to load.": "Hej. Det ser ut som att du har JavaScript avstängt. Klicka här för att visa kommentarer, ha i åtanke att nedladdning tar längre tid.",
@@ -191,17 +159,12 @@
     "Hide replies": "Dölj svar",
     "Show replies": "Visa svar",
     "Incorrect password": "Fel lösenord",
-    "Quota exceeded, try again in a few hours": "Kvoten överskriden, försök igen om ett par timmar",
-    "Unable to log in, make sure two-factor authentication (Authenticator or SMS) is turned on.": "Kunde inte logga in, försäkra dig om att tvåfaktors-autentisering (Authenticator eller SMS) är påslagen.",
-    "Invalid TFA code": "Ogiltig tvåfaktor-kod",
-    "Login failed. This may be because two-factor authentication is not turned on for your account.": "Inloggning misslyckades. Detta kan vara för att tvåfaktors-autentisering inte är påslaget på ditt konto.",
     "Wrong answer": "Fel svar",
     "Erroneous CAPTCHA": "Ogiltig CAPTCHA",
     "CAPTCHA is a required field": "CAPTCHA är ett obligatoriskt fält",
     "User ID is a required field": "Användar-ID är ett obligatoriskt fält",
     "Password is a required field": "Lösenord är ett obligatoriskt fält",
     "Wrong username or password": "Ogiltigt användarnamn eller lösenord",
-    "Please sign in using 'Log in with Google'": "Logga in genom \"Google-inloggning\"",
     "Password cannot be empty": "Lösenordet kan inte vara tomt",
     "Password cannot be longer than 55 characters": "Lösenordet kan inte vara längre än 55 tecken",
     "Please log in": "Logga in",
@@ -211,16 +174,8 @@
     "This channel does not exist.": "Denna kanal finns inte.",
     "Could not get channel info.": "Kunde inte hämta kanalinfo.",
     "Could not fetch comments": "Kunde inte hämta kommentarer",
-    "View `x` replies": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "Visa `x` svar",
-        "": "Visa `x` svar"
-    },
     "`x` ago": "`x` sedan",
     "Load more": "Ladda fler",
-    "`x` points": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` poäng",
-        "": "`x` poäng"
-    },
     "Could not create mix.": "Kunde inte skapa mix.",
     "Empty playlist": "Spellistan är tom",
     "Not a playlist.": "Ogiltig spellista.",
@@ -338,34 +293,6 @@
     "Yiddish": "Jiddisch",
     "Yoruba": "Yoruba",
     "Zulu": "Zulu",
-    "`x` years": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` år",
-        "": "`x` år"
-    },
-    "`x` months": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` månader",
-        "": "`x` månader"
-    },
-    "`x` weeks": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` veckor",
-        "": "`x` veckor"
-    },
-    "`x` days": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` dagar",
-        "": "`x` dagar"
-    },
-    "`x` hours": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` timmar",
-        "": "`x` timmar"
-    },
-    "`x` minutes": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` minuter",
-        "": "`x` minuter"
-    },
-    "`x` seconds": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` sekunder",
-        "": "`x` sekunder"
-    },
     "Fallback comments: ": "Fallback-kommentarer: ",
     "Popular": "Populärt",
     "Search": "Sök",
@@ -388,42 +315,42 @@
     "`x` marked it with a ❤": "`x` lämnade ett ❤",
     "Audio mode": "Ljudläge",
     "Video mode": "Videoläge",
-    "Videos": "Videor",
+    "channel_tab_videos_label": "Videor",
     "Playlists": "Spellistor",
-    "Community": "Gemenskap",
-    "relevance": "relevans",
-    "rating": "rankning",
-    "date": "datum",
-    "views": "visningar",
-    "content_type": "Typ",
-    "duration": "Varaktighet",
-    "features": "Funktioner",
-    "sort": "Sortera efter",
-    "hour": "timme",
-    "today": "idag",
-    "week": "vecka",
-    "month": "månad",
-    "year": "år",
-    "video": "video",
-    "channel": "kanal",
-    "playlist": "spellista",
-    "movie": "film",
-    "show": "tv-serie",
-    "hd": "hd",
-    "subtitles": "undertexter",
-    "creative_commons": "creative_commons",
-    "3d": "3d",
-    "live": "live",
-    "4k": "4k",
-    "location": "plats",
-    "hdr": "hdr",
-    "filter": "Filter",
+    "channel_tab_community_label": "Gemenskap",
+    "search_filters_sort_option_relevance": "Relevans",
+    "search_filters_sort_option_rating": "Rankning",
+    "search_filters_sort_option_date": "Datum",
+    "search_filters_sort_option_views": "Visningar",
+    "search_filters_type_label": "Typ",
+    "search_filters_duration_label": "Varaktighet",
+    "search_filters_features_label": "Funktioner",
+    "search_filters_sort_label": "Sortera efter",
+    "search_filters_date_option_hour": "timme",
+    "search_filters_date_option_today": "idag",
+    "search_filters_date_option_week": "vecka",
+    "search_filters_date_option_month": "månad",
+    "search_filters_date_option_year": "år",
+    "search_filters_type_option_video": "video",
+    "search_filters_type_option_channel": "kanal",
+    "search_filters_type_option_playlist": "spellista",
+    "search_filters_type_option_movie": "film",
+    "search_filters_type_option_show": "tv-serie",
+    "search_filters_features_option_hd": "hd",
+    "search_filters_features_option_subtitles": "undertexter",
+    "search_filters_features_option_c_commons": "creative_commons",
+    "search_filters_features_option_three_d": "3d",
+    "search_filters_features_option_live": "live",
+    "search_filters_features_option_four_k": "4k",
+    "search_filters_features_option_location": "plats",
+    "search_filters_features_option_hdr": "hdr",
     "Current version: ": "Nuvarande version: ",
     "next_steps_error_message_refresh": "Uppdatera",
     "next_steps_error_message_go_to_youtube": "Gå till Youtube",
-    "Released under the AGPLv3 on Github.": "Publicerad under AGPLv3 på Github.",
+    "Released under the AGPLv3 on Github.": "Publicerad under AGPLv3 på GitHub.",
     "footer_source_code": "Källkod",
-    "long": "Lång (> 20 minuter)",
+    "search_filters_duration_option_long": "Lång (> 20 minuter)",
     "footer_documentation": "Dokumentation",
-    "short": "Kort (< 4 minuter)"
+    "search_filters_duration_option_short": "Kort (< 4 minuter)",
+    "search_filters_title": "Filter"
 }

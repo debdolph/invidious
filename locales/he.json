@@ -1,16 +1,4 @@
 {
-    "`x` subscribers": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` רשומים",
-        "": "`x` רשומים"
-    },
-    "`x` videos": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` סרטונים",
-        "": "`x` סרטונים"
-    },
-    "`x` playlists": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` פלייליסטים",
-        "": "`x` פלייליסטים"
-    },
     "LIVE": "שידור חי",
     "Shared `x` ago": "שותף לפני `x`",
     "Unsubscribe": "ביטול מינוי",
@@ -26,7 +14,6 @@
     "Clear watch history?": "לנקות את היסטוריית הצפייה?",
     "New password": "סיסמה חדשה",
     "New passwords must match": "על הסיסמאות החדשות להתאים",
-    "Cannot change password for Google accounts": "לא ניתן לשנות את הסיסמה לחשבונות Google",
     "Authorize token?": "לאשר את האסימון?",
     "Authorize token for `x`?": "האם לאשר את האסימון עבור `x`?",
     "Yes": "כן",
@@ -49,7 +36,6 @@
     "source": "source",
     "Log in": "כניסה",
     "Log in/register": "כניסה/הרשמה",
-    "Log in with Google": "כניסה עם Google",
     "User ID": "שם משתמש",
     "Password": "סיסמה",
     "Time (h:mm:ss):": "זמן (h:mm:ss):",
@@ -58,7 +44,6 @@
     "Sign In": "התחברות",
     "Register": "הרשמה",
     "E-mail": "דוא״ל",
-    "Google verification code": "קוד האימות של Google",
     "Preferences": "העדפות",
     "preferences_category_player": "העדפות הנגן",
     "preferences_autoplay_label": "ניגון אוטומטי: ",
@@ -111,17 +96,9 @@
     "Subscription manager": "מנהל המינויים",
     "Token manager": "Token manager",
     "Token": "Token",
-    "`x` subscriptions": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` מינויים",
-        "": "`x` מינויים"
-    },
     "Import/export": "ייבוא/ייצוא",
     "unsubscribe": "ביטול מנוי",
     "Subscriptions": "מינויים",
-    "`x` unseen notifications": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` הודעות שלא נראו",
-        "": "`x` הודעות שלא נראו"
-    },
     "search": "חיפוש",
     "Log out": "יציאה",
     "Source available here.": "קוד המקור זמין כאן.",
@@ -141,10 +118,6 @@
     "License: ": "רישיון: ",
     "Family friendly? ": "לכל המשפחה? ",
     "Wilson score: ": "ציון וילסון: ",
-    "`x` views": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` צפיות.([^.,0-9]|^)1([^.,0-9]|$)",
-        "": "`x` צפיות"
-    },
     "Hi! Looks like you have JavaScript turned off. Click here to view comments, keep in mind they may take a bit longer to load.": "שלום! נראה ש־JavaScript כבוי. יש ללחוץ כאן להצגת התגובות, נא לקחת בחשבון שהטעינה תיקח קצת יותר זמן.",
     "View YouTube comments": "הצגת התגובות מ־YouTube",
     "View more comments on Reddit": "להצגת תגובות נוספות ב־Reddit",
@@ -161,7 +134,6 @@
     "User ID is a required field": "חובה למלא את שדה שם המשתמש",
     "Password is a required field": "חובה למלא את שדה הסיסמה",
     "Wrong username or password": "שם משתמש שגוי או סיסמה שגויה",
-    "Please sign in using 'Log in with Google'": "נא להתחבר בעזרת \"התחברות עם Google\"",
     "Password cannot be longer than 55 characters": "על אורך הסיסמה להיות 55 תווים לכל היותר",
     "Please log in": "נא להתחבר",
     "channel:`x`": "ערוץ:`x`",
@@ -169,10 +141,6 @@
     "This channel does not exist.": "הערוץ הזה אינו קיים.",
     "Could not get channel info.": "לא היה ניתן לקבל מידע על הערוץ.",
     "Could not fetch comments": "לא היה ניתן למשוך את התגובות",
-    "View `x` replies": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "הצגת `x` תגובות",
-        "": "הצגת `x` תגובות"
-    },
     "`x` ago": "לפני `x`",
     "Load more": "לטעון עוד",
     "Empty playlist": "פלייליסט ריק",
@@ -281,34 +249,6 @@
     "Yiddish": "יידיש",
     "Yoruba": "יורובה",
     "Zulu": "זולו",
-    "`x` years": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` שנים",
-        "": "`x` שנים"
-    },
-    "`x` months": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` חודשים",
-        "": "`x` חודשים"
-    },
-    "`x` weeks": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` שבועות",
-        "": "`x` שבועות"
-    },
-    "`x` days": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` ימים",
-        "": "`x` ימים"
-    },
-    "`x` hours": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` שעות",
-        "": "`x` שעות"
-    },
-    "`x` minutes": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` דקות",
-        "": "`x` דקות"
-    },
-    "`x` seconds": {
-        "([^.,0-9]|^)1([^.,0-9]|$)": "`x` שניות",
-        "": "`x` שניות"
-    },
     "Popular": "סרטונים פופולריים",
     "Top": "Top",
     "About": "על אודות",
@@ -327,35 +267,35 @@
     "`x` marked it with a ❤": "סומנה ב־❤ על ידי `x`",
     "Audio mode": "Audio mode",
     "Video mode": "Video mode",
-    "Videos": "סרטונים",
+    "channel_tab_videos_label": "סרטונים",
     "Playlists": "פלייליסטים",
-    "Community": "קהילה",
-    "relevance": "רלוונטיות",
-    "rating": "דירוג",
-    "date": "תאריך העלאה",
-    "views": "מספר צפיות",
-    "content_type": "סוג",
-    "duration": "משך זמן",
-    "features": "תכונות",
-    "sort": "מיון לפי",
-    "hour": "השעה האחרונה",
-    "today": "היום",
-    "week": "השבוע",
-    "month": "החודש",
-    "year": "השנה",
-    "video": "סרטון",
-    "channel": "ערוץ",
-    "playlist": "פלייליסט",
-    "movie": "סרט",
-    "show": "תכנית טלוויזיה",
-    "hd": "HD",
-    "subtitles": "כתוביות",
-    "creative_commons": "Creative Commons",
-    "3d": "3D",
-    "live": "Live",
-    "4k": "4K",
-    "location": "מיקום",
-    "hdr": "HDR",
-    "filter": "סינון",
-    "Current version: ": "הגרסה הנוכחית: "
+    "channel_tab_community_label": "קהילה",
+    "search_filters_sort_option_relevance": "רלוונטיות",
+    "search_filters_sort_option_rating": "דירוג",
+    "search_filters_sort_option_date": "תאריך העלאה",
+    "search_filters_sort_option_views": "מספר צפיות",
+    "search_filters_type_label": "סוג",
+    "search_filters_duration_label": "משך זמן",
+    "search_filters_features_label": "תכונות",
+    "search_filters_sort_label": "מיון לפי",
+    "search_filters_date_option_hour": "השעה האחרונה",
+    "search_filters_date_option_today": "היום",
+    "search_filters_date_option_week": "השבוע",
+    "search_filters_date_option_month": "החודש",
+    "search_filters_date_option_year": "השנה",
+    "search_filters_type_option_video": "סרטון",
+    "search_filters_type_option_channel": "ערוץ",
+    "search_filters_type_option_playlist": "פלייליסט",
+    "search_filters_type_option_movie": "סרט",
+    "search_filters_type_option_show": "תכנית טלוויזיה",
+    "search_filters_features_option_hd": "HD",
+    "search_filters_features_option_subtitles": "כתוביות",
+    "search_filters_features_option_c_commons": "Creative Commons",
+    "search_filters_features_option_three_d": "3D",
+    "search_filters_features_option_live": "Live",
+    "search_filters_features_option_four_k": "4K",
+    "search_filters_features_option_location": "מיקום",
+    "search_filters_features_option_hdr": "HDR",
+    "Current version: ": "הגרסה הנוכחית: ",
+    "search_filters_title": "סינון"
 }

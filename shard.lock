@@ -14,11 +14,11 @@ shards:
 
   exception_page:
     git: https://github.com/crystal-loot/exception_page.git
-    version: 0.2.0
+    version: 0.2.2
 
   kemal:
     git: https://github.com/kemalcr/kemal.git
-    version: 1.1.0
+    version: 1.1.2
 
   kilt:
     git: https://github.com/jeromegn/kilt.git
@@ -34,13 +34,20 @@ shards:
 
   protodec:
     git: https://github.com/iv-org/protodec.git
-    version: 0.1.4
+    version: 0.1.5
 
   radix:
     git: https://github.com/luislavena/radix.git
     version: 0.4.1
 
+  spectator:
+    git: https://github.com/icy-arctic-fox/spectator.git
+    version: 0.10.4
+
   sqlite3:
     git: https://github.com/crystal-lang/crystal-sqlite3.git
     version: 0.18.0
 
+  ameba:
+    git: https://github.com/crystal-ameba/ameba.git
+    version: 0.14.3

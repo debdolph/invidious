@@ -5,7 +5,7 @@
 RELEASE  := 1
 STATIC   := 0
 
-DISABLE_LSQUIC := 0
+DISABLE_QUIC := 1
 NO_DBG_SYMBOLS := 0
 
 
@@ -27,8 +27,12 @@ else
   FLAGS += --debug
 endif
 
-ifeq ($(DISABLE_LSQUIC), 1)
-  FLAGS += -Ddisable_lsquic
+ifeq ($(DISABLE_QUIC), 1)
+  FLAGS += -Ddisable_quic
+endif
+
+ifeq ($(API_ONLY), 1)
+  FLAGS += -Dapi_only
 endif
 
 
@@ -62,7 +66,8 @@ test:
 	crystal spec
 
 verify:
-	crystal build src/invidious.cr --no-codegen --progress --stats --error-trace
+	crystal build src/invidious.cr -Dskip_videojs_download \
+	  --no-codegen --progress --stats --error-trace
 
 
 # -----------------------
@@ -81,6 +86,7 @@ clean:
 
 distclean: clean
 	rm -rf libs
+	rm -rf ~/.cache/{crystal,shards}
 
 
 # -----------------------
@@ -88,28 +94,29 @@ distclean: clean
 # -----------------------
 
 help:
-	echo "Targets available in this Makefile:"
-	echo ""
-	echo "get-libs         Fetch Crystal libraries"
-	echo "invidious        Build Invidious"
-	echo "run              Launch Invidious"
-	echo ""
-	echo "format           Run the Crystal formatter"
-	echo "test             Run tests"
-	echo "verify           Just make sure that the code compiles, but without"
-	echo "                 generating any binaries. Useful to search for errors"
-	echo ""
-	echo "clean            Remove build artifacts"
-	echo "distclean        Remove build artifacts and libraries"
-	echo ""
-	echo ""
-	echo "Build options available for this Makefile:"
-	echo ""
-	echo "RELEASE          Make a release build      (Default: 1)"
-	echo "STATIC           Link librariess tatically (Default: 1)"
-	echo ""
-	echo "DISABLE_LSQUIC   Don't use lsquic          (Default: 0)"
-	echo "NO_DBG_SYMBOLS   Strip debug symbols       (Default: 0)"
+	@echo "Targets available in this Makefile:"
+	@echo ""
+	@echo "  get-libs         Fetch Crystal libraries"
+	@echo "  invidious        Build Invidious"
+	@echo "  run              Launch Invidious"
+	@echo ""
+	@echo "  format           Run the Crystal formatter"
+	@echo "  test             Run tests"
+	@echo "  verify           Just make sure that the code compiles, but without"
+	@echo "                   generating any binaries. Useful to search for errors"
+	@echo ""
+	@echo "  clean            Remove build artifacts"
+	@echo "  distclean        Remove build artifacts and libraries"
+	@echo ""
+	@echo ""
+	@echo "Build options available for this Makefile:"
+	@echo ""
+	@echo "  RELEASE          Make a release build            (Default: 1)"
+	@echo "  STATIC           Link libraries statically       (Default: 0)"
+	@echo ""
+	@echo "  API_ONLY         Build invidious without a GUI   (Default: 0)"
+	@echo "  DISABLE_QUIC     Disable support for QUIC        (Default: 0)"
+	@echo "  NO_DBG_SYMBOLS   Strip debug symbols             (Default: 0)"
 
 
 

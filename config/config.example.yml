@@ -157,17 +157,13 @@ https_only: false
 ## Note 2: Using QUIC prevents some captcha challenges from appearing.
 ## See: https://github.com/iv-org/invidious/issues/957#issuecomment-576424042
 ##
-## Note 3: As of 2021-11-12, Google seems to have disabled QUIC on
-## their servers. The default has been changed to 'false'.Read more
-## at: https://github.com/iv-org/invidious/issues/2577
-##
 ## Accepted values: true, false
 ## Default: false
 ##
 #use_quic: false
 
 ##
-## Additionnal cookies to be sent when requesting the youtube API.
+## Additional cookies to be sent when requesting the youtube API.
 ##
 ## Accepted values: a string in the format "name1=value1; name2=value2..."
 ## Default: <none>
@@ -192,7 +188,7 @@ https_only: false
 
 ##
 ## Path to log file. Can be absolute or relative to the invidious
-## binary. This is overriden if "-o OUTPUT" or "--output=OUTPUT"
+## binary. This is overridden if "-o OUTPUT" or "--output=OUTPUT"
 ## are passed on the command line.
 ##
 ## Accepted values: a filesystem path or 'STDOUT'
@@ -201,7 +197,7 @@ https_only: false
 #output: STDOUT
 
 ##
-## Logging Verbosity. This is overriden if "-l LEVEL" or
+## Logging Verbosity. This is overridden if "-l LEVEL" or
 ## "--log-level=LEVEL" are passed on the command line.
 ##
 ## Accepted values: All, Trace, Debug, Info, Warn, Error, Fatal, Off
@@ -259,8 +255,7 @@ https_only: false
 #registration_enabled: true
 
 ##
-## Allow/Forbid users to log-in. This setting affects the ability
-## to connect with BOTH Google and Invidious (local) accounts.
+## Allow/Forbid users to log-in.
 ##
 ## Accepted values: true, false
 ## Default: true
@@ -299,6 +294,17 @@ https_only: false
 ##
 #admins: [""]
 
+##
+## Enable/Disable the user notifications for all users
+##
+## Note: On large instances, it is recommended to set this option to 'false'
+## in order to reduce the amount of data written to the database, and hence
+## improve the overall performance of the instance.
+##
+## Accepted values: true, false
+## Default: true
+##
+#enable_user_notifications: true
 
 # -----------------------------
 #  Background jobs
@@ -308,15 +314,22 @@ https_only: false
 ## Number of threads to use when crawling channel videos (during
 ## subscriptions update).
 ##
-## Notes:
-##  - Setting this to 0 will disable the channel videos crawl job.
-##  - This setting is overriden if "-c THREADS" or
-##    "--channel-threads=THREADS" are passed on the command line.
+## Notes: This setting is overridden if either "-c THREADS" or
+## "--channel-threads=THREADS" is passed on the command line.
 ##
 ## Accepted values: a positive integer
 ## Default: 1
 ##
 channel_threads: 1
+
+##
+## Time interval between two executions of the job that crawls
+## channel videos (subscriptions update).
+##
+## Accepted values: a valid time interval (like 1h30m or 90m)
+## Default: 30m
+##
+#channel_refresh_interval: 30m
 
 ##
 ## Forcefully dump and re-download the entire list of uploaded
@@ -330,10 +343,8 @@ full_refresh: false
 ##
 ## Number of threads to use when updating RSS feeds.
 ##
-## Notes:
-##  - Setting this to 0 will disable the channel videos crawl job.
-##  - This setting is overriden if "-f THREADS" or
-##    "--feed-threads=THREADS" are passed on the command line.
+## Notes: This setting is overridden if either "-f THREADS" or
+## "--feed-threads=THREADS" is passed on the command line.
 ##
 ## Accepted values: a positive integer
 ## Default: 1
@@ -344,13 +355,49 @@ feed_threads: 1
 ## Enable/Disable the polling job that keeps the decryption
 ## function (for "secured" videos) up to date.
 ##
-## Note: This part of the code is currently broken, so changing
+## Note: This part of the code generate a small amount of data every minute.
+## This may not be desired if you have bandwidth limits set by your ISP.
+##
+## Note 2: This part of the code is currently broken, so changing
 ## this setting has no impact.
 ##
 ## Accepted values: true, false
-## Default: true
+## Default: false
 ##
-#decrypt_polling: true
+#decrypt_polling: false
+
+
+jobs:
+
+  ## Options for the database cleaning job
+  clear_expired_items:
+
+    ## Enable/Disable job
+    ##
+    ## Accepted values: true, false
+    ## Default: true
+    ##
+    enable: true
+
+  ## Options for the channels updater job
+  refresh_channels:
+
+    ## Enable/Disable job
+    ##
+    ## Accepted values: true, false
+    ## Default: true
+    ##
+    enable: true
+
+  ## Options for the RSS feeds updater job
+  refresh_feeds:
+
+    ## Enable/Disable job
+    ##
+    ## Accepted values: true, false
+    ## Default: true
+    ##
+    enable: true
 
 
 # -----------------------------
@@ -375,7 +422,7 @@ feed_threads: 1
 
 
 # -----------------------------
-#  Miscellanous
+#  Miscellaneous
 # -----------------------------
 
 ##
@@ -408,13 +455,17 @@ feed_threads: 1
 #use_pubsub_feeds: false
 
 ##
-## HMAC signing key used for CSRF tokens and pubsub
+## HMAC signing key used for CSRF tokens, cookies and pubsub
 ## subscriptions verification.
+##
+## Note: This parameter is mandatory and should be a random string.
+## Such random string can be generated on linux with the following
+## command: `pwgen 20 1`
 ##
 ## Accepted values: a string
 ## Default: <none>
 ##
-#hmac_key:
+hmac_key: "CHANGE_ME!!"
 
 ##
 ## List of video IDs where the "download" widget must be
@@ -437,7 +488,7 @@ feed_threads: 1
 #cache_annotations: false
 
 ##
-## Source code URL. If your instance is running a modfied source
+## Source code URL. If your instance is running a modified source
 ## code, you MUST publish it somewhere and set this option.
 ##
 ## Accepted values: a string
@@ -445,7 +496,13 @@ feed_threads: 1
 ##
 #modified_source_code_url: ""
 
-
+##
+## Maximum custom playlist length limit.
+##
+## Accepted values: Integer
+## Default: 500
+##
+#playlist_length_limit: 500
 
 #########################################
 #
@@ -524,9 +581,9 @@ default_user_preferences:
   #region: US
 
   ##
-  ## Top 3 prefered languages for video captions.
+  ## Top 3 preferred languages for video captions.
   ##
-  ## Note: overridin the default (no preferred
+  ## Note: overriding the default (no preferred
   ## caption language) is not recommended, in order
   ## to not penalize people using other languages.
   ##
@@ -570,10 +627,10 @@ default_user_preferences:
   ##
   ## Enable/Disable dark mode.
   ##
-  ## Accepted values: true, false
-  ## Default: <none>
+  ## Accepted values: "dark", "light", "auto"
+  ## Default: "auto"
   ##
-  #dark_mode:
+  #dark_mode: "auto"
 
   ##
   ## Enable/Disable thin mode (no video thumbnails).
@@ -598,7 +655,7 @@ default_user_preferences:
   #feed_menu: ["Popular", "Trending", "Subscriptions", "Playlists"]
 
   ##
-  ## Default feed to diplay on the home page.
+  ## Default feed to display on the home page.
   ##
   ## Note: setting this option to "Popular" has no
   ## effect when 'popular_enabled' is set to false.
@@ -763,6 +820,16 @@ default_user_preferences:
   ## Default: true
   ##
   #vr_mode: true
+  
+  ##
+  ## Save the playback position
+  ## Allow to continue watching at the previous position when
+  ## watching the same video.
+  ##
+  ## Accepted values: true, false
+  ## Default: false
+  ##
+  #save_player_pos: false
 
   # -----------------------------
   #  Subscription feed
@@ -816,7 +883,7 @@ default_user_preferences:
 
 
   # -----------------------------
-  #  Miscellanous
+  #  Miscellaneous
   # -----------------------------
 
   ##
@@ -851,3 +918,13 @@ default_user_preferences:
   ## Default: false
   ##
   #automatic_instance_redirect: false
+
+  ##
+  ## Show the entire video description by default (when set to 'false',
+  ## only the first few lines of the description are shown and a
+  ## "show more" button allows to expand it).
+  ##
+  ## Accepted values: true, false
+  ## Default: false
+  ##
+  #extend_desc: false

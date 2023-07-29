@@ -1,3 +1,7 @@
+/*
+ * Common attributes
+ */
+
 html,
 body {
   font-family: BlinkMacSystemFont, -apple-system, "Segoe UI", Roboto, Oxygen,
@@ -11,9 +15,52 @@ body {
   min-height: 100vh;
 }
 
+.h-box {
+  padding-left: 1em;
+  padding-right: 1em;
+}
+
+.v-box {
+  padding-top: 1em;
+  padding-bottom: 1em;
+}
+
 .deleted {
   background-color: rgb(255, 0, 0, 0.5);
 }
+
+.underlined {
+  border-bottom: 1px solid;
+  margin-bottom: 20px;
+}
+
+.title {
+  margin: 0.5em 0 1em 0;
+}
+
+/* A flex container */
+.flexible {
+  display: flex;
+  align-items: center;
+}
+
+.flex-left {
+  display: flex;
+  flex: 1 1 auto;
+  flex-flow: row wrap;
+  justify-content: flex-start;
+}
+.flex-right {
+  display: flex;
+  flex: 2 0 auto;
+  flex-flow: row nowrap;
+  justify-content: flex-end;
+}
+
+
+/*
+ * Channel page
+ */
 
 .channel-profile > * {
   font-size: 1.17em;
@@ -41,6 +88,7 @@ body a.channel-owner {
 }
 
 .creator-heart {
+  display: inline-block;
   position: relative;
   width: 16px;
   height: 16px;
@@ -61,6 +109,7 @@ body a.channel-owner {
 }
 
 .creator-heart-small-container {
+  display: block;
   position: relative;
   width: 13px;
   height: 13px;
@@ -83,16 +132,6 @@ body a.channel-owner {
   }
 }
 
-.h-box {
-  padding-left: 1em;
-  padding-right: 1em;
-}
-
-.v-box {
-  padding-top: 1em;
-  padding-bottom: 1em;
-}
-
 div {
   overflow-wrap: break-word;
   word-wrap: break-word;
@@ -108,61 +147,106 @@ div {
   padding-right: 10px;
 }
 
+
+/*
+ * Buttons
+ */
+
 body a.pure-button {
   color: rgba(0,0,0,.8);
 }
 
 button.pure-button-primary,
 body a.pure-button-primary,
-.channel-owner:hover {
+.channel-owner:hover,
+.channel-owner:focus {
   background-color: #a0a0a0;
   color: rgba(35, 35, 35, 1);
 }
 
-button.pure-button-primary:hover,
-body a.pure-button-primary:hover {
-  background-color: rgba(0, 182, 240, 1);
-  color: #fff;
+.pure-button-primary,
+.pure-button-secondary {
+  border: 1px solid #a0a0a0;
+  border-radius: 3px;
+  margin: 0 .4em;
 }
 
+.pure-button-secondary.low-profile {
+  padding: 5px 10px;
+  margin: 0;
+}
+
+/* Has to be combined with flex-left/right */
+.button-container {
+  flex-flow: wrap;
+  gap: 0.5em 0.75em;
+}
+
+
+/*
+ * Video thumbnails
+ */
+
 div.thumbnail {
-  padding: 28.125%;
   position: relative;
+  width: 100%;
   box-sizing: border-box;
 }
 
 img.thumbnail {
-  position: absolute;
+  display: block; /* See: https://stackoverflow.com/a/11635197 */
   width: 100%;
-  height: 100%;
-  left: 0;
-  top: 0;
   object-fit: cover;
 }
 
-.length {
-  z-index: 100;
-  position: absolute;
-  background-color: rgba(35, 35, 35, 0.75);
-  color: #fff;
-  border-radius: 2px;
-  padding: 2px;
-  font-size: 16px;
-  right: 0.25em;
-  bottom: -0.75em;
+.thumbnail-placeholder {
+  min-height: 50px;
+  border: 2px dotted;
 }
 
-.watched {
+div.watched-overlay {
+  z-index: 50;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255,255,255,.4);
+}
+
+div.watched-indicator {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 4px;
+  width: 100%;
+  background-color: red;
+}
+
+div.thumbnail > .top-left-overlay,
+div.thumbnail > .bottom-right-overlay {
   z-index: 100;
   position: absolute;
-  background-color: rgba(35, 35, 35, 0.75);
-  color: #fff;
-  border-radius: 2px;
-  padding: 4px 8px 4px 8px;
+  padding: 0;
+  margin: 0;
   font-size: 16px;
-  left: 0.2em;
-  top: -0.7em;
 }
+
+.top-left-overlay { top: 0.6em; left: 0.6em; }
+.bottom-right-overlay { bottom: 0.6em; right: 0.6em; }
+
+.length {
+  padding: 1px;
+  margin: -2px 0;
+  color: #fff;
+  border-radius: 3px;
+}
+
+.length, .top-left-overlay button {
+  color: #eee;
+  background-color: rgba(35, 35, 35, 0.85) !important;
+}
+
 
 /*
  * Navbar
@@ -192,20 +276,27 @@ img.thumbnail {
   display: inline;
 }
 
-.searchbar .pure-form input[type="search"] {
-  margin-bottom: 1px;
+.searchbar .pure-form fieldset { padding: 0; }
 
-  border-top: 0;
-  border-left: 0;
-  border-right: 0;
-  border-bottom: 1px solid #ccc;
-  border-radius: 0;
+.searchbar input[type="search"] {
+	width: 100%;
+	margin: 1px;
 
-  padding: initial 0;
+	border: 1px solid;
+	border-color: rgba(0,0,0,0);
+	border-bottom-color: #CCC;
+	border-radius: 0;
 
-  box-shadow: none;
+	box-shadow: none;
+	appearance: none;
+	-webkit-appearance: none;
+}
 
-  -webkit-appearance: none;
+.searchbar input[type="search"]:focus {
+	margin: 0;
+	border: 2px solid;
+	border-color: rgba(0,0,0,0);
+	border-bottom-color: #FED;
 }
 
 /* https://stackoverflow.com/a/55170420 */
@@ -217,16 +308,6 @@ input[type="search"]::-webkit-search-cancel-button {
   background-size: 14px;
 }
 
-.searchbar .pure-form fieldset {
-  padding: 0;
-}
-
-/* attract focus to the searchbar by adding a subtle transition */
-.searchbar .pure-form input[type="search"]:focus {
-  margin-bottom: 0px;
-  border-bottom: 2px solid #aaa;
-}
-
 .user-field {
   display: flex;
   flex-direction: row;
@@ -235,12 +316,17 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 
 .user-field div {
-  width: initial;
+  width: auto;
 }
 
 .user-field div:not(:last-child) {
   margin-right: 1em;
 }
+
+
+/*
+ * Responsive rules
+ */
 
 @media only screen and (max-aspect-ratio: 16/9) {
   .player-dimensions.vjs-fluid {
@@ -260,20 +346,28 @@ input[type="search"]::-webkit-search-cancel-button {
   .navbar > div {
     display: flex;
     justify-content: center;
-  }
-
-  .navbar > div:not(:last-child) {
-    margin-bottom: 1em;
+    margin-bottom: 25px;
   }
 
   .navbar > .searchbar > form {
-    width: 60%;
+    width: 75%;
   }
 
   h1 {
     font-size: 1.25em;
     margin: 0.42em 0;
   }
+
+  /* Space out the subscribe & RSS buttons and align them to the left */
+  .title.flexible { display: block; }
+  .title.flexible > .flex-right { margin: 0.75em 0; justify-content: flex-start; }
+
+  /* Space out buttons to make them easier to tap */
+  .user-field { font-size: 125%; }
+  .user-field > :not(:last-child) { margin-right: 1.75em; }
+
+  .icon-buttons { font-size: 125%; }
+  .icon-buttons > :not(:last-child) { margin-right: 0.75em; }
 }
 
 @media screen and (max-width: 320px) {
@@ -290,12 +384,48 @@ input[type="search"]::-webkit-search-cancel-button {
 
 .video-card-row { margin: 15px 0; }
 
-.flexible { display: flex; }
-.flex-left  { flex: 1 1 100%; flex-wrap: wrap;   }
-.flex-right { flex: 1 0 max-content; flex-wrap: nowrap; }
-
 p.channel-name { margin: 0; }
 p.video-data   { margin: 0; font-weight: bold; font-size: 80%; }
+
+
+/*
+ * Comments & community posts
+ */
+
+#comments {
+  max-width: 800px;
+  margin: auto;
+}
+
+.video-iframe-wrapper {
+  position: relative;
+  height: 0;
+  padding-bottom: 56.25%;
+}
+
+.video-iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+
+/*
+ * Page navigation
+ */
+
+.page-nav-container { margin: 15px 0 30px 0; }
+
+.page-prev-container { text-align: start; }
+.page-next-container { text-align: end; }
+
+.page-prev-container,
+.page-next-container {
+  display: inline-block;
+}
 
 
 /*
@@ -340,18 +470,31 @@ span > select {
   word-wrap: normal;
 }
 
+
 /*
  * Light theme
  */
 
 .light-theme a:hover,
 .light-theme a:active,
-.light-theme summary:hover {
+.light-theme summary:hover,
+.light-theme a:focus,
+.light-theme summary:focus {
   color: #075A9E !important;
 }
 
-.light-theme a.pure-button-primary:hover {
+.light-theme .pure-button-primary:hover,
+.light-theme .pure-button-primary:focus,
+.light-theme .pure-button-secondary:hover,
+.light-theme .pure-button-secondary:focus {
   color: #fff !important;
+  border-color: rgba(0, 182, 240, 0.75) !important;
+  background-color: rgba(0, 182, 240, 0.75) !important;
+}
+
+.light-theme .pure-button-secondary:not(.low-profile) {
+  color: #335d7a;
+  background-color: #fff2;
 }
 
 .light-theme a {
@@ -373,12 +516,24 @@ span > select {
 @media (prefers-color-scheme: light) {
   .no-theme a:hover,
   .no-theme a:active,
-  .no-theme summary:hover  {
+  .no-theme summary:hover,
+  .no-theme a:focus,
+  .no-theme summary:focus {
     color: #075A9E !important;
   }
 
-  .no-theme a.pure-button-primary:hover {
+  .no-theme .pure-button-primary:hover,
+  .no-theme .pure-button-primary:focus,
+  .no-theme .pure-button-secondary:hover,
+  .no-theme .pure-button-secondary:focus {
     color: #fff !important;
+    border-color: rgba(0, 182, 240, 0.75) !important;
+    background-color: rgba(0, 182, 240, 0.75) !important;
+  }
+
+  .no-theme .pure-button-secondary:not(.low-profile) {
+    color: #335d7a;
+    background-color: #fff2;
   }
 
   .no-theme a {
@@ -398,14 +553,31 @@ span > select {
   }
 }
 
+
 /*
  * Dark theme
  */
 
 .dark-theme a:hover,
 .dark-theme a:active,
-.dark-theme summary:hover {
+.dark-theme summary:hover,
+.dark-theme a:focus,
+.dark-theme summary:focus {
   color: rgb(0, 182, 240);
+}
+
+.dark-theme .pure-button-primary:hover,
+.dark-theme .pure-button-primary:focus,
+.dark-theme .pure-button-secondary:hover,
+.dark-theme .pure-button-secondary:focus {
+  color: #fff !important;
+  border-color: rgb(0, 182, 240) !important;
+  background-color: rgba(0, 182, 240, 1) !important;
+}
+
+.dark-theme .pure-button-secondary {
+  background-color: #0002;
+  color: #ddd;
 }
 
 .dark-theme a {
@@ -443,8 +615,23 @@ body.dark-theme {
 
 @media (prefers-color-scheme: dark) {
   .no-theme a:hover,
-  .no-theme a:active {
+  .no-theme a:active,
+  .no-theme a:focus {
     color: rgb(0, 182, 240);
+  }
+
+  .no-theme .pure-button-primary:hover,
+  .no-theme .pure-button-primary:focus,
+  .no-theme .pure-button-secondary:hover,
+  .no-theme .pure-button-secondary:focus {
+    color: #fff !important;
+    border-color: rgb(0, 182, 240) !important;
+    background-color: rgba(0, 182, 240, 1) !important;
+  }
+
+  .no-theme .pure-button-secondary {
+    background-color: #0002;
+    color: #ddd;
   }
 
   .no-theme a {
@@ -481,29 +668,11 @@ body.dark-theme {
   }
 }
 
-#filters {
-  display: inline;
-  margin-top: 15px;
-}
 
-#filters > div {
-  display: inline-block;
-}
+/*
+ * Miscellanous
+ */
 
-#filters > summary {
-  display: block;
-  margin-bottom: 15px;
-}
-
-#filters > summary::before {
-  content: "[ + ]";
-  font-size: 1.5em;
-}
-
-#filters[open] > summary::before {
-  content: "[ - ]";
-  font-size: 1.5em;
-}
 
 /*With commit d9528f5 all contents of the page is now within a flexbox. However,
 the hr element is rendered improperly within one.
@@ -513,13 +682,17 @@ hr {
 }
 
 /* Description Expansion Styling*/
-#descexpansionbutton {
-  display: none
+#descexpansionbutton,
+#music-desc-expansion {
+  display: none;
 }
 
 #descexpansionbutton ~ div {
   overflow: hidden;
-  height: 8.3em;
+}
+
+#descexpansionbutton:not(:checked) ~ div {
+  max-height: 8.3em;
 }
 
 #descexpansionbutton:checked ~ div {
@@ -532,22 +705,57 @@ hr {
   margin-top: 20px;
 }
 
+label[for="descexpansionbutton"]:hover,
+label[for="music-desc-expansion"]:hover {
+  cursor: pointer;
+}
+
 /* Bidi (bidirectional text) support */
-h1,
-h2,
-h3,
-h4,
-h5,
-p,
+h1, h2, h3, h4, h5, p,
 #descriptionWrapper,
-#description-box {
-	unicode-bidi: plaintext;
-	text-align: start;
+#description-box,
+#music-description-box {
+  unicode-bidi: plaintext;
+  text-align: start;
 }
 
 #descriptionWrapper {
-       max-width: 600px;
+  max-width: 600px;
+  white-space: pre-wrap;
+}
+
+#music-description-box {
+  display: none;
+}
+
+#music-desc-expansion:checked ~ #music-description-box {
+  display: block;
+}
+
+#music-desc-expansion ~ label > h3 > .ion-ios-arrow-up,
+#music-desc-expansion:checked ~ label > h3 > .ion-ios-arrow-down {
+  display: none;
+}
+
+#music-desc-expansion:checked ~ label > h3 > .ion-ios-arrow-up,
+#music-desc-expansion ~ label > h3 > .ion-ios-arrow-down {
+  display: inline;
+}
+
+/* Select all the music items except the first one */
+.music-item + .music-item {
+  border-top: 1px solid #ffffff;
 }
 
 /* Center the "invidious" logo on the search page */
 #logo > h1 { text-align: center; }
+
+/* IE11 fixes */
+:-ms-input-placeholder { color: #888; }
+
+/* Wider settings name to less word wrap */
+.pure-form-aligned .pure-control-group label { width: 19em; }
+
+.channel-emoji {
+  margin: 0 2px;
+}
